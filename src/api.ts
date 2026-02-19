@@ -1,0 +1,106 @@
+import type {
+  ComplexDetailResponse,
+  MapPinsResponse,
+  PortfolioFilters,
+  PortfolioListResponse,
+} from "./types";
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
+
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    if (data && typeof data.detail === "string") return data.detail;
+  } catch {
+    // ignore json parse error
+  }
+  return fallback;
+}
+
+export interface BoundsQuery {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+  zoom: number;
+}
+
+function buildUrl(path: string, query?: Record<string, string>) {
+  if (!query) {
+    return `${API_BASE}${path}`;
+  }
+  const qs = new URLSearchParams(query).toString();
+  return `${API_BASE}${path}?${qs}`;
+}
+
+export async function fetchMapPins(bounds: BoundsQuery): Promise<MapPinsResponse> {
+  const url = buildUrl("/map/pins", {
+    south: String(bounds.south),
+    west: String(bounds.west),
+    north: String(bounds.north),
+    east: String(bounds.east),
+    zoom: String(bounds.zoom),
+  });
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch map pins"));
+  return res.json();
+}
+
+export async function fetchComplexDetail(complexId: number): Promise<ComplexDetailResponse> {
+  const res = await fetch(buildUrl(`/complexes/${complexId}`));
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch complex detail"));
+  return res.json();
+}
+
+export async function fetchPortfolios(
+  complexId: number,
+  unitTypeId: number,
+  filters: PortfolioFilters,
+): Promise<PortfolioListResponse> {
+  const query: Record<string, string> = {
+    unit_type_id: String(unitTypeId),
+    limit: "30",
+    offset: "0",
+  };
+
+  if (filters.min_area !== undefined) query.min_area = String(filters.min_area);
+  if (filters.max_area !== undefined) query.max_area = String(filters.max_area);
+  if (filters.budget_min_krw !== undefined) query.budget_min_krw = String(filters.budget_min_krw);
+  if (filters.budget_max_krw !== undefined) query.budget_max_krw = String(filters.budget_max_krw);
+  if (filters.work_scope) query.work_scope = filters.work_scope;
+  if (filters.style) query.style = filters.style;
+
+  const res = await fetch(buildUrl(`/complexes/${complexId}/portfolios`, query));
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch portfolios"));
+  return res.json();
+}
+
+export async function saveFavorite(userKey: string, portfolioId: number): Promise<void> {
+  const res = await fetch(buildUrl("/favorites"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_key: userKey, portfolio_id: portfolioId }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to save favorite"));
+}
+
+export async function requestQuote(params: {
+  userKey: string;
+  vendorId?: number;
+  portfolioId?: number;
+  message?: string;
+  preferredDate?: string;
+}): Promise<void> {
+  const res = await fetch(buildUrl("/quote-requests"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_key: params.userKey,
+      vendor_id: params.vendorId,
+      portfolio_id: params.portfolioId,
+      message: params.message,
+      preferred_date: params.preferredDate,
+    }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to request quote"));
+}

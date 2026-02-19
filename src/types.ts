@@ -1,0 +1,68 @@
+export type WorkScopeType = "kitchen" | "bathroom" | "partial" | "full_remodeling";
+
+export interface ClusterPin {
+  cluster_key: string;
+  center_latitude: number;
+  center_longitude: number;
+  count: number;
+}
+
+export interface ComplexPin {
+  complex_id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  portfolio_count: number;
+}
+
+export interface MapPinsResponse {
+  clusters: ClusterPin[];
+  complexes: ComplexPin[];
+}
+
+export interface UnitTypeChip {
+  unit_type_id: number;
+  exclusive_area_m2: number;
+  type_code?: string | null;
+  room_count?: number | null;
+  bathroom_count?: number | null;
+  structure_keyword?: string | null;
+  portfolio_count: number;
+}
+
+export interface ComplexDetailResponse {
+  complex_id: number;
+  name: string;
+  address: string;
+  built_year?: number | null;
+  household_count?: number | null;
+  unit_types: UnitTypeChip[];
+}
+
+export interface PortfolioCard {
+  portfolio_id: number;
+  title: string;
+  before_image_url?: string | null;
+  after_image_url?: string | null;
+  work_scope: WorkScopeType;
+  style: string;
+  budget_min_krw?: number | null;
+  budget_max_krw?: number | null;
+  duration_days?: number | null;
+  vendor_id?: number | null;
+  vendor_name?: string | null;
+}
+
+export interface PortfolioListResponse {
+  items: PortfolioCard[];
+  total: number;
+}
+
+export interface PortfolioFilters {
+  min_area?: number;
+  max_area?: number;
+  budget_min_krw?: number;
+  budget_max_krw?: number;
+  work_scope?: WorkScopeType;
+  style?: string;
+}

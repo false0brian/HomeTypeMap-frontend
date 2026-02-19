@@ -1,4 +1,5 @@
 export type WorkScopeType = "kitchen" | "bathroom" | "partial" | "full_remodeling";
+export type PublishStatus = "draft" | "review" | "published";
 
 export interface ClusterPin {
   cluster_key: string;
@@ -65,4 +66,52 @@ export interface PortfolioFilters {
   budget_max_krw?: number;
   work_scope?: WorkScopeType;
   style?: string;
+}
+
+export interface AdminPortfolio {
+  portfolio_id: number;
+  complex_id: number;
+  unit_type_id: number;
+  vendor_id?: number | null;
+  title: string;
+  work_scope: string;
+  style: string;
+  status: PublishStatus;
+  budget_min_krw?: number | null;
+  budget_max_krw?: number | null;
+  duration_days?: number | null;
+  published_at?: string | null;
+  created_at: string;
+}
+
+export interface AdminPortfolioCreateInput {
+  complex_id: number;
+  unit_type_id: number;
+  vendor_id?: number;
+  title: string;
+  work_scope: string;
+  style: string;
+  status: PublishStatus;
+}
+
+export interface AdminBlogPost {
+  post_id: number;
+  vendor_id?: number | null;
+  title: string;
+  slug: string;
+  excerpt?: string | null;
+  content: string;
+  status: PublishStatus;
+  published_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminBlogPostCreateInput {
+  vendor_id?: number;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content: string;
+  status: PublishStatus;
 }

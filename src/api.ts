@@ -1,4 +1,9 @@
 import type {
+  AdminBlogPost,
+  AdminBlogPostCreateInput,
+  AdminPortfolio,
+  AdminPortfolioCreateInput,
+  PublishStatus,
   ComplexDetailResponse,
   MapPinsResponse,
   PortfolioFilters,
@@ -31,6 +36,13 @@ function buildUrl(path: string, query?: Record<string, string>) {
   }
   const qs = new URLSearchParams(query).toString();
   return `${API_BASE}${path}?${qs}`;
+}
+
+function adminHeaders(adminKey: string) {
+  return {
+    "Content-Type": "application/json",
+    "X-Admin-Key": adminKey,
+  };
 }
 
 export async function fetchMapPins(bounds: BoundsQuery): Promise<MapPinsResponse> {
@@ -103,4 +115,70 @@ export async function requestQuote(params: {
     }),
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to request quote"));
+}
+
+export async function adminListPortfolios(adminKey: string): Promise<AdminPortfolio[]> {
+  const res = await fetch(buildUrl("/admin/portfolios"), {
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch admin portfolios"));
+  return res.json();
+}
+
+export async function adminCreatePortfolio(
+  adminKey: string,
+  payload: AdminPortfolioCreateInput,
+): Promise<AdminPortfolio> {
+  const res = await fetch(buildUrl("/admin/portfolios"), {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to create portfolio"));
+  return res.json();
+}
+
+export async function adminUpdatePortfolioStatus(
+  adminKey: string,
+  portfolioId: number,
+  status: PublishStatus,
+): Promise<AdminPortfolio> {
+  const res = await fetch(buildUrl(`/admin/portfolios/${portfolioId}`), {
+    method: "PATCH",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to update portfolio"));
+  return res.json();
+}
+
+export async function adminListBlogPosts(adminKey: string): Promise<AdminBlogPost[]> {
+  const res = await fetch(buildUrl("/admin/blog-posts"), {
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch blog posts"));
+  return res.json();
+}
+
+export async function adminCreateBlogPost(
+  adminKey: string,
+  payload: AdminBlogPostCreateInput,
+): Promise<AdminBlogPost> {
+  const res = await fetch(buildUrl("/admin/blog-posts"), {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to create blog post"));
+  return res.json();
+}
+
+export async function adminUpdateBlogStatus(adminKey: string, postId: number, status: PublishStatus): Promise<AdminBlogPost> {
+  const res = await fetch(buildUrl(`/admin/blog-posts/${postId}`), {
+    method: "PATCH",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to update blog post"));
+  return res.json();
 }

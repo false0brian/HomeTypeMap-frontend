@@ -6,6 +6,7 @@ import type {
   PublishStatus,
   ComplexDetailResponse,
   MapPinsResponse,
+  NearbyComplexesResponse,
   PortfolioFilters,
   PortfolioListResponse,
 } from "./types";
@@ -55,6 +56,22 @@ export async function fetchMapPins(bounds: BoundsQuery): Promise<MapPinsResponse
   });
   const res = await fetch(url);
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch map pins"));
+  return res.json();
+}
+
+export async function fetchNearbyComplexes(
+  latitude: number,
+  longitude: number,
+  radiusM: number,
+): Promise<NearbyComplexesResponse> {
+  const res = await fetch(
+    buildUrl("/map/nearby", {
+      lat: String(latitude),
+      lng: String(longitude),
+      radius_m: String(radiusM),
+    }),
+  );
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch nearby complexes"));
   return res.json();
 }
 

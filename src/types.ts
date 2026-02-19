@@ -14,11 +14,19 @@ export interface ComplexPin {
   latitude: number;
   longitude: number;
   portfolio_count: number;
+  distance_m?: number | null;
 }
 
 export interface MapPinsResponse {
   clusters: ClusterPin[];
   complexes: ComplexPin[];
+}
+
+export interface NearbyComplexesResponse {
+  center_latitude: number;
+  center_longitude: number;
+  radius_m: number;
+  items: ComplexPin[];
 }
 
 export interface UnitTypeChip {

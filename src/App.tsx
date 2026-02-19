@@ -4,6 +4,7 @@ import * as L from "leaflet";
 import {
   fetchComplexDetail,
   fetchMapPins,
+  fetchNearbyComplexes,
   fetchPortfolios,
   requestQuote,
   saveFavorite,
@@ -30,6 +31,9 @@ const DEFAULT_BOUNDS: BoundsQuery = {
 const DEFAULT_CENTER: L.LatLngExpression = [37.4875, 127.1022];
 const DEFAULT_FILTERS: PortfolioFilters = {};
 
+type MobilePanel = "map" | "list";
+type MapMode = "bounds" | "nearby";
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -48,6 +52,12 @@ function priceLabel(min?: number | null, max?: number | null) {
   return `${lo} ~ ${hi}`;
 }
 
+function cardSummary(card: PortfolioCard) {
+  const duration = card.duration_days ? `${card.duration_days}일` : "기간 미정";
+  const vendor = card.vendor_name ?? "업체 미지정";
+  return `예산 ${priceLabel(card.budget_min_krw, card.budget_max_krw)} · ${card.work_scope} · ${duration} · ${vendor}`;
+}
+
 function markerIcon(className: string, text: string): L.DivIcon {
   return L.divIcon({
     className: "",
@@ -61,6 +71,8 @@ export default function App() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const userLayerRef = useRef<L.LayerGroup | null>(null);
+  const cardsRef = useRef<HTMLDivElement | null>(null);
 
   const [bounds, setBounds] = useState<BoundsQuery>(DEFAULT_BOUNDS);
   const [clusters, setClusters] = useState<ClusterPin[]>([]);
@@ -81,6 +93,25 @@ export default function App() {
   const [loadingPortfolios, setLoadingPortfolios] = useState(false);
   const [status, setStatus] = useState<string>("지도를 초기화하는 중입니다.");
 
+  const [mapMode, setMapMode] = useState<MapMode>("bounds");
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("map");
+  const [highlightList, setHighlightList] = useState(false);
+  const [nearbyRadiusM, setNearbyRadiusM] = useState(3000);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  const syncBoundsFromMap = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = map.getBounds();
+    setBounds({
+      south: b.getSouth(),
+      west: b.getWest(),
+      north: b.getNorth(),
+      east: b.getEast(),
+      zoom: map.getZoom(),
+    });
+  };
+
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -94,38 +125,31 @@ export default function App() {
 
     mapRef.current = map;
     markerLayerRef.current = L.layerGroup().addTo(map);
+    userLayerRef.current = L.layerGroup().addTo(map);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    const syncBounds = () => {
-      const b = map.getBounds();
-      setBounds({
-        south: b.getSouth(),
-        west: b.getWest(),
-        north: b.getNorth(),
-        east: b.getEast(),
-        zoom: map.getZoom(),
-      });
-    };
-
-    map.on("moveend", syncBounds);
-    map.on("zoomend", syncBounds);
-    syncBounds();
+    map.on("moveend", syncBoundsFromMap);
+    map.on("zoomend", syncBoundsFromMap);
+    syncBoundsFromMap();
 
     setStatus("지도 준비 완료. 핀을 선택하세요.");
 
     return () => {
-      map.off("moveend", syncBounds);
-      map.off("zoomend", syncBounds);
+      map.off("moveend", syncBoundsFromMap);
+      map.off("zoomend", syncBoundsFromMap);
       map.remove();
       mapRef.current = null;
       markerLayerRef.current = null;
+      userLayerRef.current = null;
     };
   }, []);
 
   useEffect(() => {
+    if (mapMode !== "bounds") return;
+
     let cancelled = false;
 
     const loadPins = async () => {
@@ -150,7 +174,27 @@ export default function App() {
       cancelled = true;
       clearTimeout(id);
     };
-  }, [bounds]);
+  }, [bounds, mapMode]);
+
+  useEffect(() => {
+    const layer = userLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+
+    if (!userLocation) return;
+
+    L.circle([userLocation.latitude, userLocation.longitude], {
+      radius: nearbyRadiusM,
+      color: "#325f8c",
+      weight: 2,
+      fillColor: "#325f8c",
+      fillOpacity: 0.12,
+    }).addTo(layer);
+
+    L.marker([userLocation.latitude, userLocation.longitude], {
+      icon: markerIcon("user-dot", "내"),
+    }).addTo(layer);
+  }, [userLocation, nearbyRadiusM]);
 
   useEffect(() => {
     if (!mapRef.current || !markerLayerRef.current) return;
@@ -171,12 +215,13 @@ export default function App() {
 
     complexes.forEach((pin) => {
       const active = selectedComplex?.complex_id === pin.complex_id;
+      const badgeText = pin.distance_m != null ? `${Math.max(1, Math.round(pin.distance_m / 100))}` : String(pin.portfolio_count);
       const marker = L.marker([pin.latitude, pin.longitude], {
-        icon: markerIcon(active ? "complex-dot active" : "complex-dot", String(pin.portfolio_count)),
+        icon: markerIcon(active ? "complex-dot active" : "complex-dot", badgeText),
       });
       marker.on("click", () => {
         map.panTo([pin.latitude, pin.longitude]);
-        void handleSelectComplex(pin.complex_id);
+        void handleSelectComplex(pin.complex_id, true);
       });
       marker.addTo(layer);
     });
@@ -194,6 +239,9 @@ export default function App() {
         if (cancelled) return;
         setPortfolios(data.items);
         setStatus(`조회 완료: ${data.total}건`);
+        if (highlightList) {
+          cardsRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        }
       } catch (e) {
         if (cancelled) return;
         setStatus(e instanceof Error ? e.message : "포트폴리오를 불러오지 못했습니다.");
@@ -206,17 +254,40 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedComplex, selectedUnitType, filters]);
+  }, [selectedComplex, selectedUnitType, filters, highlightList]);
+
+  useEffect(() => {
+    if (!highlightList) return;
+    const timer = window.setTimeout(() => setHighlightList(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [highlightList]);
 
   const unitTypeButtons = useMemo(() => selectedComplex?.unit_types ?? [], [selectedComplex]);
 
-  async function handleSelectComplex(complexId: number) {
+  const activeFilterChips = useMemo(() => {
+    const chips: Array<{ key: keyof PortfolioFilters; label: string }> = [];
+    if (filters.work_scope) chips.push({ key: "work_scope", label: `범위 ${filters.work_scope}` });
+    if (filters.min_area !== undefined) chips.push({ key: "min_area", label: `최소평형 ${filters.min_area}` });
+    if (filters.budget_max_krw !== undefined) chips.push({ key: "budget_max_krw", label: `예산상한 ${filters.budget_max_krw.toLocaleString()}원` });
+    return chips;
+  }, [filters]);
+
+  const selectedDistance = useMemo(() => {
+    if (!selectedComplex) return null;
+    return complexes.find((x) => x.complex_id === selectedComplex.complex_id)?.distance_m ?? null;
+  }, [complexes, selectedComplex]);
+
+  async function handleSelectComplex(complexId: number, fromMap = false) {
     setStatus("단지 정보를 불러오는 중입니다.");
     try {
       const detail = await fetchComplexDetail(complexId);
       setSelectedComplex(detail);
       const first = detail.unit_types[0] ?? null;
       setSelectedUnitType(first);
+      if (fromMap) {
+        setMobilePanel("list");
+        setHighlightList(true);
+      }
       if (!first) {
         setPortfolios([]);
         setStatus("이 단지는 타입 정보가 없습니다.");
@@ -234,11 +305,87 @@ export default function App() {
     });
   }
 
+  function applyPreset(type: "partial" | "budget20" | "area59") {
+    if (type === "partial") {
+      setWorkScopeDraft("partial");
+      setFilters((prev) => ({ ...prev, work_scope: "partial" }));
+      return;
+    }
+    if (type === "budget20") {
+      setBudgetMaxDraft("20000000");
+      setFilters((prev) => ({ ...prev, budget_max_krw: 20000000 }));
+      return;
+    }
+    setMinAreaDraft("59");
+    setFilters((prev) => ({ ...prev, min_area: 59 }));
+  }
+
+  function clearFilter(key: keyof PortfolioFilters) {
+    setFilters((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    if (key === "work_scope") setWorkScopeDraft("");
+    if (key === "min_area") setMinAreaDraft("");
+    if (key === "budget_max_krw") setBudgetMaxDraft("");
+  }
+
   function resetFilters() {
     setWorkScopeDraft("");
     setMinAreaDraft("");
     setBudgetMaxDraft("");
     setFilters(DEFAULT_FILTERS);
+  }
+
+  async function focusNearby() {
+    if (!navigator.geolocation) {
+      setStatus("이 브라우저는 위치 정보를 지원하지 않습니다.");
+      return;
+    }
+
+    setStatus("현재 위치를 확인하는 중입니다.");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        void (async () => {
+          const latitude = pos.coords.latitude;
+          const longitude = pos.coords.longitude;
+
+          setUserLocation({ latitude, longitude });
+          if (mapRef.current) {
+            mapRef.current.setView([latitude, longitude], Math.max(14, mapRef.current.getZoom()));
+          }
+
+          setLoadingMap(true);
+          try {
+            const data = await fetchNearbyComplexes(latitude, longitude, nearbyRadiusM);
+            setMapMode("nearby");
+            setClusters([]);
+            setComplexes(data.items);
+            setStatus(`내 위치 기준 ${Math.round(nearbyRadiusM / 1000)}km 내 ${data.items.length}개 단지`);
+          } catch (e) {
+            setStatus(e instanceof Error ? e.message : "근처 단지를 불러오지 못했습니다.");
+          } finally {
+            setLoadingMap(false);
+          }
+        })();
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setStatus("위치 권한이 거부되었습니다. 브라우저에서 위치 권한을 허용해 주세요.");
+          return;
+        }
+        setStatus("위치 정보를 가져오지 못했습니다.");
+      },
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 },
+    );
+  }
+
+  function backToBoundsMode() {
+    setMapMode("bounds");
+    setUserLocation(null);
+    syncBoundsFromMap();
+    setStatus("일반 지도 탐색 모드로 전환했습니다.");
   }
 
   async function onFavorite(portfolioId: number) {
@@ -287,6 +434,8 @@ export default function App() {
   function resetMapView() {
     if (!mapRef.current) return;
     mapRef.current.setView(DEFAULT_CENTER, DEFAULT_BOUNDS.zoom);
+    setMapMode("bounds");
+    setUserLocation(null);
   }
 
   return (
@@ -339,21 +488,51 @@ export default function App() {
         </div>
       </section>
 
+      <section className="preset-row">
+        <button onClick={() => applyPreset("partial")}>부분공사</button>
+        <button onClick={() => applyPreset("budget20")}>2천만 이하</button>
+        <button onClick={() => applyPreset("area59")}>59m2 이상</button>
+        {activeFilterChips.map((chip) => (
+          <button key={chip.key} className="active-chip" onClick={() => clearFilter(chip.key)}>
+            {chip.label} ×
+          </button>
+        ))}
+      </section>
+
       <p className="status-bar">{status}</p>
 
+      <section className="mobile-panel-tabs">
+        <button className={mobilePanel === "map" ? "tab active" : "tab"} onClick={() => setMobilePanel("map")}>지도</button>
+        <button className={mobilePanel === "list" ? "tab active" : "tab"} onClick={() => setMobilePanel("list")}>리스트</button>
+      </section>
+
       <main className="content">
-        <section className="map-panel">
+        <section className={mobilePanel === "list" ? "map-panel mobile-hidden" : "map-panel"}>
           <div className="map-toolbar">
             <button onClick={resetMapView}>초기화</button>
-            {loadingMap ? <span>지도 로딩 중...</span> : <span>클러스터 {clusters.length} / 핀 {complexes.length}</span>}
+            <button onClick={() => void focusNearby()}>내 위치 주변</button>
+            <select value={nearbyRadiusM} onChange={(e) => setNearbyRadiusM(Number(e.target.value))}>
+              <option value={1000}>1km</option>
+              <option value={3000}>3km</option>
+              <option value={5000}>5km</option>
+            </select>
+            {mapMode === "nearby" ? <button onClick={backToBoundsMode}>일반 탐색</button> : null}
+            {loadingMap ? (
+              <span>지도 로딩 중...</span>
+            ) : (
+              <span>
+                {mapMode === "nearby" ? "근처 보기" : "기본 보기"} · 클러스터 {clusters.length} / 핀 {complexes.length}
+              </span>
+            )}
           </div>
           <div className="map-canvas" ref={mapContainerRef} />
         </section>
 
-        <section className="sheet">
+        <section className={mobilePanel === "map" ? "sheet mobile-hidden" : "sheet"}>
           <div className="sheet-head">
             <h2>{selectedComplex?.name ?? "단지를 선택하세요"}</h2>
             <p>{selectedComplex?.address ?? "지도에서 단지 핀을 클릭하면 상세가 열립니다."}</p>
+            {selectedDistance != null ? <p className="distance-pill">현재 위치에서 약 {Math.round(selectedDistance)}m</p> : null}
           </div>
 
           <div className="type-chips">
@@ -375,20 +554,14 @@ export default function App() {
 
           {loadingPortfolios ? <p className="state">포트폴리오 로딩 중...</p> : null}
 
-          <div className="cards">
+          <div ref={cardsRef} className={highlightList ? "cards cards-highlight" : "cards"}>
             {portfolios.map((card) => (
               <article key={card.portfolio_id} className="portfolio-card">
-                <div className="thumbs">
-                  <div>{card.before_image_url ? "Before" : "이미지 없음"}</div>
-                  <div>{card.after_image_url ? "After" : "이미지 없음"}</div>
-                </div>
                 <h3>{card.title}</h3>
-                <div className="meta">
+                <p className="card-summary">{cardSummary(card)}</p>
+                <div className="meta compact">
                   <span>{card.style}</span>
                   <span>{card.work_scope}</span>
-                  <span>{priceLabel(card.budget_min_krw, card.budget_max_krw)}</span>
-                  <span>{card.duration_days ? `${card.duration_days}일` : "기간 미정"}</span>
-                  <span>{card.vendor_name ?? "업체 미지정"}</span>
                 </div>
                 <div className="actions">
                   <button className="ghost" onClick={() => onFavorite(card.portfolio_id)}>

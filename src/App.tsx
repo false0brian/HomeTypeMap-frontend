@@ -14,6 +14,7 @@ import type {
   ClusterPin,
   ComplexDetailResponse,
   ComplexPin,
+  FloorPlanPin as FloorPlanPinData,
   PortfolioCard,
   PortfolioFilters,
   UnitTypeChip,
@@ -35,7 +36,15 @@ const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=S
 type MobilePanel = "map" | "list";
 type MapMode = "bounds" | "nearby";
 type CardImageSide = "before" | "after";
-type FloorPin = { portfolioId: number; x: number; y: number };
+type FloorPin = {
+  portfolioId: number;
+  pinId: string;
+  x: number;
+  y: number;
+  title?: string | null;
+  beforeImageUrls: string[];
+  afterImageUrls: string[];
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -108,6 +117,12 @@ function imageList(card: PortfolioCard, side: CardImageSide): string[] {
   return side === "before" ? sampleBeforeUrls(card.portfolio_id) : sampleAfterUrls(card.portfolio_id);
 }
 
+function pinImageList(pin: FloorPlanPinData | undefined, side: CardImageSide, portfolioId: number): string[] {
+  const urls = side === "before" ? pin?.before_image_urls : pin?.after_image_urls;
+  if (urls && urls.length > 0) return urls;
+  return side === "before" ? sampleBeforeUrls(portfolioId) : sampleAfterUrls(portfolioId);
+}
+
 function markerIcon(className: string, text: string): L.DivIcon {
   return L.divIcon({
     className: "",
@@ -150,6 +165,7 @@ export default function App() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedCardImages, setSelectedCardImages] = useState<Record<number, CardImageSide>>({});
   const [selectedPinnedPortfolioId, setSelectedPinnedPortfolioId] = useState<number | null>(null);
+  const [selectedFloorPinId, setSelectedFloorPinId] = useState<string | null>(null);
   const [gallerySide, setGallerySide] = useState<CardImageSide>("after");
 
   const syncBoundsFromMap = () => {
@@ -335,10 +351,12 @@ export default function App() {
     if (selectedPinnedPortfolioId == null) return;
     if (portfolios.some((x) => x.portfolio_id === selectedPinnedPortfolioId)) return;
     setSelectedPinnedPortfolioId(null);
+    setSelectedFloorPinId(null);
   }, [portfolios, selectedPinnedPortfolioId]);
 
   useEffect(() => {
     setSelectedPinnedPortfolioId(null);
+    setSelectedFloorPinId(null);
   }, [selectedUnitType?.unit_type_id]);
 
   const unitTypeButtons = useMemo(() => selectedComplex?.unit_types ?? [], [selectedComplex]);
@@ -363,33 +381,73 @@ export default function App() {
   const floorPlanPins = useMemo<FloorPin[]>(() => {
     const pins: FloorPin[] = [];
     portfolios.forEach((card) => {
+      if (card.floor_plan_pins && card.floor_plan_pins.length > 0) {
+        card.floor_plan_pins.forEach((pin) => {
+          pins.push({
+            portfolioId: card.portfolio_id,
+            pinId: pin.pin_id,
+            title: pin.title,
+            x: pin.x,
+            y: pin.y,
+            beforeImageUrls: pinImageList(pin, "before", card.portfolio_id),
+            afterImageUrls: pinImageList(pin, "after", card.portfolio_id),
+          });
+        });
+        return;
+      }
       pins.push({
         portfolioId: card.portfolio_id,
+        pinId: `${card.portfolio_id}-pin-1`,
+        title: "포인트 1",
         x: card.floor_plan_pin_x ?? fallbackFloorPin(card.portfolio_id).x,
         y: card.floor_plan_pin_y ?? fallbackFloorPin(card.portfolio_id).y,
+        beforeImageUrls: imageList(card, "before"),
+        afterImageUrls: imageList(card, "after"),
       });
     });
     return pins;
   }, [portfolios]);
 
+  useEffect(() => {
+    if (selectedPinnedPortfolioId == null) return;
+    if (selectedFloorPinId) return;
+    const firstPin = floorPlanPins.find((x) => x.portfolioId === selectedPinnedPortfolioId);
+    if (firstPin) setSelectedFloorPinId(firstPin.pinId);
+  }, [selectedPinnedPortfolioId, selectedFloorPinId, floorPlanPins]);
+
   const selectedPinnedCard = useMemo(
     () => portfolios.find((x) => x.portfolio_id === selectedPinnedPortfolioId) ?? null,
     [portfolios, selectedPinnedPortfolioId],
   );
+  const selectedFloorPin = useMemo(() => {
+    if (!selectedPinnedPortfolioId) return null;
+    if (selectedFloorPinId) {
+      const exact = floorPlanPins.find((x) => x.portfolioId === selectedPinnedPortfolioId && x.pinId === selectedFloorPinId);
+      if (exact) return exact;
+    }
+    return floorPlanPins.find((x) => x.portfolioId === selectedPinnedPortfolioId) ?? null;
+  }, [floorPlanPins, selectedPinnedPortfolioId, selectedFloorPinId]);
 
   const galleryBeforeImages = useMemo(
-    () => (selectedPinnedCard ? imageList(selectedPinnedCard, "before") : []),
-    [selectedPinnedCard],
+    () => (selectedFloorPin ? selectedFloorPin.beforeImageUrls : []),
+    [selectedFloorPin],
   );
   const galleryAfterImages = useMemo(
-    () => (selectedPinnedCard ? imageList(selectedPinnedCard, "after") : []),
-    [selectedPinnedCard],
+    () => (selectedFloorPin ? selectedFloorPin.afterImageUrls : []),
+    [selectedFloorPin],
   );
 
-  function onFloorPinSelect(portfolioId: number) {
+  function firstPinIdForPortfolio(portfolioId: number): string {
+    const first = floorPlanPins.find((x) => x.portfolioId === portfolioId);
+    return first?.pinId ?? `${portfolioId}-pin-1`;
+  }
+
+  function onFloorPinSelect(pin: FloorPin) {
+    const portfolioId = pin.portfolioId;
     const defaultSide = selectedCardImages[portfolioId] ?? "after";
     setSelectedCardImages((prev) => ({ ...prev, [portfolioId]: defaultSide }));
     setSelectedPinnedPortfolioId(portfolioId);
+    setSelectedFloorPinId(pin.pinId);
     setGallerySide(defaultSide);
     setMobilePanel("list");
     setHighlightList(true);
@@ -698,15 +756,15 @@ export default function App() {
                 />
                 <div className="floor-plan-pin-layer">
                   {floorPlanPins.map((pin) => {
-                    const active = selectedPinnedPortfolioId === pin.portfolioId;
+                    const active = selectedPinnedPortfolioId === pin.portfolioId && selectedFloorPinId === pin.pinId;
                     return (
                       <button
-                        key={`${pin.portfolioId}`}
+                        key={`${pin.pinId}`}
                         type="button"
                         className={active ? "floor-plan-pin active" : "floor-plan-pin"}
                         style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-                        onClick={() => onFloorPinSelect(pin.portfolioId)}
-                        title={`핀 · #${pin.portfolioId}`}
+                        onClick={() => onFloorPinSelect(pin)}
+                        title={`${pin.title ?? "핀"} · #${pin.portfolioId}`}
                       >
                         ●
                       </button>
@@ -718,7 +776,9 @@ export default function App() {
                 <div className="pin-gallery">
                   <div className="pin-gallery-head">
                     <strong>{selectedPinnedCard.title}</strong>
-                    <span>핀 #{selectedPinnedCard.portfolio_id}</span>
+                    <span>
+                      {selectedFloorPin?.title ?? "핀"} · #{selectedPinnedCard.portfolio_id}
+                    </span>
                   </div>
                   <div className="pin-gallery-tabs">
                     <button className={gallerySide === "before" ? "active" : ""} onClick={() => setGallerySide("before")}>
@@ -754,6 +814,7 @@ export default function App() {
                     onClick={() => {
                       setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "before" }));
                       setSelectedPinnedPortfolioId(card.portfolio_id);
+                      setSelectedFloorPinId(firstPinIdForPortfolio(card.portfolio_id));
                       setGallerySide("before");
                     }}
                   >
@@ -777,6 +838,7 @@ export default function App() {
                     onClick={() => {
                       setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "after" }));
                       setSelectedPinnedPortfolioId(card.portfolio_id);
+                      setSelectedFloorPinId(firstPinIdForPortfolio(card.portfolio_id));
                       setGallerySide("after");
                     }}
                   >

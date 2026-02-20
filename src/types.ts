@@ -49,6 +49,15 @@ export interface ComplexDetailResponse {
   unit_types: UnitTypeChip[];
 }
 
+export interface FloorPlanPin {
+  pin_id: string;
+  x: number;
+  y: number;
+  title?: string | null;
+  before_image_urls?: string[] | null;
+  after_image_urls?: string[] | null;
+}
+
 export interface PortfolioCard {
   portfolio_id: number;
   title: string;
@@ -58,6 +67,7 @@ export interface PortfolioCard {
   after_image_urls?: string[] | null;
   floor_plan_pin_x?: number | null;
   floor_plan_pin_y?: number | null;
+  floor_plan_pins?: FloorPlanPin[] | null;
   work_scope: WorkScopeType;
   style: string;
   budget_min_krw?: number | null;

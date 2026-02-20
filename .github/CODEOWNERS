@@ -1,0 +1,6 @@
+# Global owner
+* @false0brian
+
+# Frontend critical paths
+/src/ @false0brian
+/.github/ @false0brian

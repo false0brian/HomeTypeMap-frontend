@@ -510,6 +510,45 @@ body {
   border-color: var(--accent);
 }
 
+.floor-plan-panel {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 14px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.floor-plan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.floor-plan-head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.floor-plan-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.floor-plan-image-wrap {
+  border: 1px solid #cad8c9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f7faf4;
+}
+
+.floor-plan-image-wrap img {
+  display: block;
+  width: 100%;
+  height: 168px;
+  object-fit: cover;
+}
+
 .cards {
   overflow: auto;
   padding: 12px;
@@ -540,16 +579,68 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  margin-bottom: 8px;
 }
 
-.thumbs div {
-  border: 1px dashed #cad8c9;
+.thumb {
+  position: relative;
+  border: 1px solid #cad8c9;
   border-radius: 10px;
-  min-height: 64px;
-  display: grid;
-  place-items: center;
+  min-height: 92px;
+  background: #f6f8f1;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
   color: var(--muted);
   font-size: 12px;
+  cursor: pointer;
+}
+
+.thumb:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+}
+
+.thumb span {
+  display: grid;
+  place-items: center;
+  min-height: 92px;
+}
+
+.thumb strong {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.thumb.selected {
+  outline: 2px solid #74b097;
+}
+
+.thumb-pin {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  color: #fff;
+  background: #226f54;
 }
 
 .portfolio-card h3 {

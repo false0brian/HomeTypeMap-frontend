@@ -30,9 +30,11 @@ const DEFAULT_BOUNDS: BoundsQuery = {
 
 const DEFAULT_CENTER: L.LatLngExpression = [37.4875, 127.1022];
 const DEFAULT_FILTERS: PortfolioFilters = {};
+const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=Sample+Floor+Plan";
 
 type MobilePanel = "map" | "list";
 type MapMode = "bounds" | "nearby";
+type CardImageSide = "before" | "after";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -56,6 +58,20 @@ function cardSummary(card: PortfolioCard) {
   const duration = card.duration_days ? `${card.duration_days}일` : "기간 미정";
   const vendor = card.vendor_name ?? "업체 미지정";
   return `예산 ${priceLabel(card.budget_min_krw, card.budget_max_krw)} · ${card.work_scope} · ${duration} · ${vendor}`;
+}
+
+function defaultImageSide(card: PortfolioCard): CardImageSide | null {
+  if (card.after_image_url) return "after";
+  if (card.before_image_url) return "before";
+  return "after";
+}
+
+function sampleBeforeUrl(portfolioId: number) {
+  return `https://placehold.co/960x640/f4efe8/3f3a34?text=Before+Sample+${portfolioId}`;
+}
+
+function sampleAfterUrl(portfolioId: number) {
+  return `https://placehold.co/960x640/e8f4eb/254739?text=After+Sample+${portfolioId}`;
 }
 
 function markerIcon(className: string, text: string): L.DivIcon {
@@ -98,6 +114,7 @@ export default function App() {
   const [highlightList, setHighlightList] = useState(false);
   const [nearbyRadiusM, setNearbyRadiusM] = useState(3000);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedCardImages, setSelectedCardImages] = useState<Record<number, CardImageSide>>({});
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -262,6 +279,26 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [highlightList]);
 
+  useEffect(() => {
+    setSelectedCardImages((prev) => {
+      const next: Record<number, CardImageSide> = {};
+      portfolios.forEach((card) => {
+        const selected = prev[card.portfolio_id];
+        if (selected === "before" && card.before_image_url) {
+          next[card.portfolio_id] = "before";
+          return;
+        }
+        if (selected === "after" && card.after_image_url) {
+          next[card.portfolio_id] = "after";
+          return;
+        }
+        const fallback = defaultImageSide(card);
+        if (fallback) next[card.portfolio_id] = fallback;
+      });
+      return next;
+    });
+  }, [portfolios]);
+
   const unitTypeButtons = useMemo(() => selectedComplex?.unit_types ?? [], [selectedComplex]);
 
   const activeFilterChips = useMemo(() => {
@@ -276,6 +313,10 @@ export default function App() {
     if (!selectedComplex) return null;
     return complexes.find((x) => x.complex_id === selectedComplex.complex_id)?.distance_m ?? null;
   }, [complexes, selectedComplex]);
+
+  const selectedFloorPlanImage = useMemo(() => {
+    return selectedUnitType?.floor_plan_image_url || SAMPLE_FLOOR_PLAN_URL;
+  }, [selectedUnitType]);
 
   async function handleSelectComplex(complexId: number, fromMap = false) {
     setStatus("단지 정보를 불러오는 중입니다.");
@@ -551,12 +592,76 @@ export default function App() {
               );
             })}
           </div>
+          {selectedUnitType ? (
+            <section className="floor-plan-panel">
+              <div className="floor-plan-head">
+                <h3>평면도</h3>
+                <p>
+                  {Math.round(selectedUnitType.exclusive_area_m2)}
+                  {selectedUnitType.type_code ?? ""}
+                  {selectedUnitType.structure_keyword ? ` · ${selectedUnitType.structure_keyword}` : ""}
+                </p>
+              </div>
+              <div className="floor-plan-image-wrap">
+                <img
+                  src={selectedFloorPlanImage}
+                  alt="선택 평형 평면도"
+                  loading="lazy"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (img.src === SAMPLE_FLOOR_PLAN_URL) return;
+                    img.src = SAMPLE_FLOOR_PLAN_URL;
+                  }}
+                />
+              </div>
+            </section>
+          ) : null}
 
           {loadingPortfolios ? <p className="state">포트폴리오 로딩 중...</p> : null}
 
           <div ref={cardsRef} className={highlightList ? "cards cards-highlight" : "cards"}>
             {portfolios.map((card) => (
               <article key={card.portfolio_id} className="portfolio-card">
+                <div className="thumbs">
+                  <button
+                    type="button"
+                    className={selectedCardImages[card.portfolio_id] === "before" ? "thumb selected" : "thumb"}
+                    onClick={() => setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "before" }))}
+                  >
+                    <img
+                      src={card.before_image_url || sampleBeforeUrl(card.portfolio_id)}
+                      alt={`${card.title} before`}
+                      loading="lazy"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        const fallback = sampleBeforeUrl(card.portfolio_id);
+                        if (img.src === fallback) return;
+                        img.src = fallback;
+                      }}
+                    />
+                    <strong>Before</strong>
+                    {selectedCardImages[card.portfolio_id] === "before" ? <i className="thumb-pin">PIN</i> : null}
+                  </button>
+                  <button
+                    type="button"
+                    className={selectedCardImages[card.portfolio_id] === "after" ? "thumb selected" : "thumb"}
+                    onClick={() => setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "after" }))}
+                  >
+                    <img
+                      src={card.after_image_url || sampleAfterUrl(card.portfolio_id)}
+                      alt={`${card.title} after`}
+                      loading="lazy"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        const fallback = sampleAfterUrl(card.portfolio_id);
+                        if (img.src === fallback) return;
+                        img.src = fallback;
+                      }}
+                    />
+                    <strong>After</strong>
+                    {selectedCardImages[card.portfolio_id] === "after" ? <i className="thumb-pin">PIN</i> : null}
+                  </button>
+                </div>
                 <h3>{card.title}</h3>
                 <p className="card-summary">{cardSummary(card)}</p>
                 <div className="meta compact">

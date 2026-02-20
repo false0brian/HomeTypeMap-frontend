@@ -36,6 +36,7 @@ export interface UnitTypeChip {
   room_count?: number | null;
   bathroom_count?: number | null;
   structure_keyword?: string | null;
+  floor_plan_image_url?: string | null;
   portfolio_count: number;
 }
 

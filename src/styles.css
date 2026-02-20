@@ -563,7 +563,7 @@ body {
   height: 24px;
   border-radius: 999px;
   color: #fff;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   background: #325f8c;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
@@ -573,6 +573,65 @@ body {
 .floor-plan-pin.active {
   background: #226f54;
   outline: 2px solid #b7ddcb;
+}
+
+.pin-gallery {
+  border: 1px solid #cad8c9;
+  border-radius: 12px;
+  padding: 8px;
+  background: #f9fcf7;
+}
+
+.pin-gallery-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.pin-gallery-head strong {
+  font-size: 12px;
+}
+
+.pin-gallery-head span {
+  color: var(--muted);
+}
+
+.pin-gallery-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pin-gallery-tabs button {
+  border: 1px solid #b7cbb8;
+  border-radius: 999px;
+  background: #fff;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: #325047;
+}
+
+.pin-gallery-tabs button.active {
+  background: #226f54;
+  border-color: #226f54;
+  color: #fff;
+}
+
+.pin-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pin-gallery-grid img {
+  width: 100%;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #d4ddcf;
+  background: #fff;
 }
 
 .cards {

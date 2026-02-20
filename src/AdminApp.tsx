@@ -1,14 +1,18 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import {
+  adminCreateFloorPlanPin,
   adminCreateBlogPost,
   adminCreatePortfolio,
+  adminDeleteFloorPlanPin,
+  adminListFloorPlanPins,
   adminListBlogPosts,
   adminListPortfolios,
+  adminUpdateFloorPlanPin,
   adminUpdateBlogStatus,
   adminUpdatePortfolioStatus,
 } from "./api";
-import type { AdminBlogPost, AdminPortfolio, PublishStatus } from "./types";
+import type { AdminBlogPost, AdminFloorPlanPin, AdminPortfolio, PublishStatus } from "./types";
 
 const DEFAULT_ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY ?? "";
 
@@ -17,6 +21,17 @@ export default function AdminApp() {
   const [status, setStatus] = useState("관리자 콘솔 준비 중");
   const [portfolios, setPortfolios] = useState<AdminPortfolio[]>([]);
   const [posts, setPosts] = useState<AdminBlogPost[]>([]);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
+  const [pins, setPins] = useState<AdminFloorPlanPin[]>([]);
+  const [editingPinId, setEditingPinId] = useState<number | null>(null);
+  const [pinForm, setPinForm] = useState({
+    x_ratio: "50",
+    y_ratio: "50",
+    title: "",
+    sort_order: "1",
+    before_urls: "",
+    after_urls: "",
+  });
   const [portfolioForm, setPortfolioForm] = useState({
     complex_id: "101",
     unit_type_id: "1001",
@@ -47,6 +62,9 @@ export default function AdminApp() {
       ]);
       setPortfolios(nextPortfolios);
       setPosts(nextPosts);
+      if (nextPortfolios.length > 0 && !selectedPortfolioId) {
+        setSelectedPortfolioId(nextPortfolios[0].portfolio_id);
+      }
       setStatus(`불러오기 완료: 포트폴리오 ${nextPortfolios.length}개, 블로그 ${nextPosts.length}개`);
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "관리자 데이터를 불러오지 못했습니다.");
@@ -95,6 +113,15 @@ export default function AdminApp() {
     }
   }
 
+  async function refreshPins(portfolioId: number) {
+    try {
+      const rows = await adminListFloorPlanPins(adminKey.trim(), portfolioId);
+      setPins(rows);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "핀 목록 불러오기 실패");
+    }
+  }
+
   async function publishPortfolio(portfolioId: number) {
     try {
       await adminUpdatePortfolioStatus(adminKey.trim(), portfolioId, "published");
@@ -111,6 +138,70 @@ export default function AdminApp() {
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "블로그 상태 변경 실패");
     }
+  }
+
+  useEffect(() => {
+    if (!selectedPortfolioId || !adminKey.trim()) return;
+    void refreshPins(selectedPortfolioId);
+  }, [selectedPortfolioId, adminKey]);
+
+  async function savePin(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedPortfolioId) return;
+    const payload = {
+      x_ratio: Number(pinForm.x_ratio),
+      y_ratio: Number(pinForm.y_ratio),
+      title: pinForm.title || undefined,
+      sort_order: Number(pinForm.sort_order || "0"),
+      before_image_urls: pinForm.before_urls.split("\n").map((x) => x.trim()).filter(Boolean),
+      after_image_urls: pinForm.after_urls.split("\n").map((x) => x.trim()).filter(Boolean),
+    };
+    try {
+      if (editingPinId) {
+        await adminUpdateFloorPlanPin(adminKey.trim(), editingPinId, payload);
+      } else {
+        await adminCreateFloorPlanPin(adminKey.trim(), selectedPortfolioId, payload);
+      }
+      setEditingPinId(null);
+      setPinForm({ x_ratio: "50", y_ratio: "50", title: "", sort_order: "1", before_urls: "", after_urls: "" });
+      await refreshPins(selectedPortfolioId);
+      setStatus("핀 저장 완료");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "핀 저장 실패");
+    }
+  }
+
+  function editPin(pin: AdminFloorPlanPin) {
+    setEditingPinId(pin.pin_id);
+    setPinForm({
+      x_ratio: String(pin.x_ratio),
+      y_ratio: String(pin.y_ratio),
+      title: pin.title ?? "",
+      sort_order: String(pin.sort_order),
+      before_urls: pin.before_image_urls.join("\n"),
+      after_urls: pin.after_image_urls.join("\n"),
+    });
+  }
+
+  async function removePin(pinId: number) {
+    if (!selectedPortfolioId) return;
+    try {
+      await adminDeleteFloorPlanPin(adminKey.trim(), pinId);
+      if (editingPinId === pinId) {
+        setEditingPinId(null);
+      }
+      await refreshPins(selectedPortfolioId);
+      setStatus("핀 삭제 완료");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "핀 삭제 실패");
+    }
+  }
+
+  function onFloorPlanClick(clientX: number, clientY: number, el: HTMLElement) {
+    const rect = el.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+    setPinForm((prev) => ({ ...prev, x_ratio: x.toFixed(2), y_ratio: y.toFixed(2) }));
   }
 
   return (
@@ -187,6 +278,111 @@ export default function AdminApp() {
                 <button onClick={() => void publishPortfolio(item.portfolio_id)}>발행 처리</button>
               </article>
             ))}
+          </div>
+
+          <h2>평면도 핀 편집</h2>
+          <div className="admin-form">
+            <label>
+              대상 포트폴리오
+              <select
+                value={selectedPortfolioId ?? ""}
+                onChange={(e) => setSelectedPortfolioId(Number(e.target.value))}
+              >
+                {portfolios.map((item) => (
+                  <option key={item.portfolio_id} value={item.portfolio_id}>
+                    #{item.portfolio_id} {item.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div
+            className="floor-plan-editor"
+            onClick={(e) => onFloorPlanClick(e.clientX, e.clientY, e.currentTarget)}
+          >
+            {pins.map((pin) => (
+              <button
+                key={pin.pin_id}
+                type="button"
+                className={editingPinId === pin.pin_id ? "editor-pin active" : "editor-pin"}
+                style={{ left: `${pin.x_ratio}%`, top: `${pin.y_ratio}%` }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editPin(pin);
+                }}
+                title={pin.title ?? `pin-${pin.pin_id}`}
+              >
+                {pin.sort_order}
+              </button>
+            ))}
+          </div>
+
+          <form className="admin-form" onSubmit={savePin}>
+            <input
+              value={pinForm.title}
+              onChange={(e) => setPinForm((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="핀 제목"
+            />
+            <div className="pin-grid">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={pinForm.x_ratio}
+                onChange={(e) => setPinForm((prev) => ({ ...prev, x_ratio: e.target.value }))}
+                placeholder="x(%)"
+                required
+              />
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={pinForm.y_ratio}
+                onChange={(e) => setPinForm((prev) => ({ ...prev, y_ratio: e.target.value }))}
+                placeholder="y(%)"
+                required
+              />
+              <input
+                type="number"
+                min="0"
+                value={pinForm.sort_order}
+                onChange={(e) => setPinForm((prev) => ({ ...prev, sort_order: e.target.value }))}
+                placeholder="sort_order"
+              />
+            </div>
+            <textarea
+              rows={4}
+              value={pinForm.before_urls}
+              onChange={(e) => setPinForm((prev) => ({ ...prev, before_urls: e.target.value }))}
+              placeholder="Before 이미지 URL (줄바꿈으로 여러 개)"
+            />
+            <textarea
+              rows={4}
+              value={pinForm.after_urls}
+              onChange={(e) => setPinForm((prev) => ({ ...prev, after_urls: e.target.value }))}
+              placeholder="After 이미지 URL (줄바꿈으로 여러 개)"
+            />
+            <button type="submit">{editingPinId ? "핀 수정 저장" : "핀 추가"}</button>
+          </form>
+
+          <div className="admin-list">
+            {pins.map((pin) => (
+              <article key={pin.pin_id} className="admin-card">
+                <h3>{pin.title ?? `핀 ${pin.pin_id}`}</h3>
+                <p>
+                  ({pin.x_ratio.toFixed(2)}%, {pin.y_ratio.toFixed(2)}%) / before {pin.before_image_urls.length} / after{" "}
+                  {pin.after_image_urls.length}
+                </p>
+                <div className="pin-actions">
+                  <button onClick={() => editPin(pin)}>편집</button>
+                  <button onClick={() => void removePin(pin.pin_id)}>삭제</button>
+                </div>
+              </article>
+            ))}
+            {pins.length === 0 ? <p className="state">핀이 없습니다.</p> : null}
           </div>
         </section>
 

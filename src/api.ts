@@ -1,6 +1,9 @@
 import type {
   AdminBlogPost,
   AdminBlogPostCreateInput,
+  AdminFloorPlanPin,
+  AdminFloorPlanPinCreateInput,
+  AdminFloorPlanPinUpdateInput,
   AdminPortfolio,
   AdminPortfolioCreateInput,
   PublishStatus,
@@ -198,4 +201,48 @@ export async function adminUpdateBlogStatus(adminKey: string, postId: number, st
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to update blog post"));
   return res.json();
+}
+
+export async function adminListFloorPlanPins(adminKey: string, portfolioId: number): Promise<AdminFloorPlanPin[]> {
+  const res = await fetch(buildUrl(`/admin/portfolios/${portfolioId}/floor-plan-pins`), {
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch floor plan pins"));
+  return res.json();
+}
+
+export async function adminCreateFloorPlanPin(
+  adminKey: string,
+  portfolioId: number,
+  payload: AdminFloorPlanPinCreateInput,
+): Promise<AdminFloorPlanPin> {
+  const res = await fetch(buildUrl(`/admin/portfolios/${portfolioId}/floor-plan-pins`), {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to create floor plan pin"));
+  return res.json();
+}
+
+export async function adminUpdateFloorPlanPin(
+  adminKey: string,
+  pinId: number,
+  payload: AdminFloorPlanPinUpdateInput,
+): Promise<AdminFloorPlanPin> {
+  const res = await fetch(buildUrl(`/admin/floor-plan-pins/${pinId}`), {
+    method: "PATCH",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to update floor plan pin"));
+  return res.json();
+}
+
+export async function adminDeleteFloorPlanPin(adminKey: string, pinId: number): Promise<void> {
+  const res = await fetch(buildUrl(`/admin/floor-plan-pins/${pinId}`), {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to delete floor plan pin"));
 }

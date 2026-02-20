@@ -1,50 +1,37 @@
-# HomeTypeMap React Frontend
+# HomeTypeMap Frontend
 
-FastAPI 백엔드와 연동되는 React(Vite+TypeScript) 프론트입니다.
-지도는 Leaflet + OpenStreetMap 타일을 사용하며 API 키가 필요 없습니다.
+HomeTypeMap 사용자/관리자 웹 프론트엔드 저장소입니다.
+React + Vite + TypeScript + Leaflet 기반입니다.
 
-## 실행 (로컬)
+## Run
 ```bash
-cd frontend
 cp .env.example .env
 npm install
 npm run dev
 ```
 
-환경 변수:
+기본 주소:
+- 사용자: `http://127.0.0.1:5173`
+- 관리자: `http://127.0.0.1:5173/admin`
+
+## Env
 - `VITE_API_BASE` (기본: `/api/v1`)
-- `VITE_ADMIN_API_KEY` (선택: 관리자 콘솔 기본 키)
+- `VITE_ADMIN_API_KEY` (선택)
 
-기본값은 Vite proxy로 백엔드 `http://127.0.0.1:8000`에 연결됩니다.
-
-## 실행 (Docker)
-루트에서:
+## Build
 ```bash
-docker compose up --build
+npm run build
 ```
 
-접속:
-- 프론트: `http://127.0.0.1:5173`
-- 백엔드 Swagger: `http://127.0.0.1:8000/docs`
-
-## 사용성 개선 반영
-- `window.prompt` 제거: 상단 `user_key` 입력 필드로 통일
-- 필터 즉시 반영 제거: `필터 적용` 버튼으로 쿼리 트리거
-- `필터 초기화` 버튼 제공
-- 상태 문구(`status`)를 상단 바에 고정 노출
-
-## 파일
-- `src/App.tsx`: 지도/시트 UI, 상태관리, 액션
-- `src/AdminApp.tsx`: 관리자 콘솔(`/admin`) UI
+## Key Files
+- `src/App.tsx`: 사용자 앱
+- `src/AdminApp.tsx`: 관리자 콘솔
 - `src/api.ts`: API 클라이언트
 - `src/types.ts`: DTO 타입
-- `src/styles.css`: UI 스타일
+- `src/styles.css`: 디자인 시스템/컴포넌트 스타일
 
-## 관리자 콘솔
-- URL: `http://127.0.0.1:5173/admin`
-- 요청 헤더: `X-Admin-Key`
+## CI
+- GitHub Actions: `.github/workflows/frontend-ci.yml`
 
-## 사용자 화면 개선
-- 지도 화면에서 `내 위치 주변`으로 현재 위치 반경 단지 탐색
-- 필터 프리셋(부분공사/2천만 이하/59m2 이상)과 활성 필터 칩 제공
-- 모바일에서 `지도/리스트` 탭 전환 지원
+## Sync Policy
+- 모노레포/백엔드 저장소와 동기화 규칙은 `docs/repo-sync-policy.md` 참고

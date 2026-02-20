@@ -54,6 +54,10 @@ export interface PortfolioCard {
   title: string;
   before_image_url?: string | null;
   after_image_url?: string | null;
+  floor_plan_before_x?: number | null;
+  floor_plan_before_y?: number | null;
+  floor_plan_after_x?: number | null;
+  floor_plan_after_y?: number | null;
   work_scope: WorkScopeType;
   style: string;
   budget_min_krw?: number | null;

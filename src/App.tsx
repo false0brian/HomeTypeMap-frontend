@@ -35,6 +35,7 @@ const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=S
 type MobilePanel = "map" | "list";
 type MapMode = "bounds" | "nearby";
 type CardImageSide = "before" | "after";
+type FloorPin = { portfolioId: number; side: CardImageSide; x: number; y: number };
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -72,6 +73,13 @@ function sampleBeforeUrl(portfolioId: number) {
 
 function sampleAfterUrl(portfolioId: number) {
   return `https://placehold.co/960x640/e8f4eb/254739?text=After+Sample+${portfolioId}`;
+}
+
+function fallbackFloorPin(portfolioId: number, side: CardImageSide): { x: number; y: number } {
+  const baseX = 18 + (portfolioId * 17 % 64);
+  const baseY = 16 + (portfolioId * 13 % 66);
+  if (side === "before") return { x: baseX, y: baseY };
+  return { x: Math.min(92, baseX + 6), y: Math.min(92, baseY + 4) };
 }
 
 function markerIcon(className: string, text: string): L.DivIcon {
@@ -115,6 +123,7 @@ export default function App() {
   const [nearbyRadiusM, setNearbyRadiusM] = useState(3000);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedCardImages, setSelectedCardImages] = useState<Record<number, CardImageSide>>({});
+  const [selectedPinnedPortfolioId, setSelectedPinnedPortfolioId] = useState<number | null>(null);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -284,12 +293,8 @@ export default function App() {
       const next: Record<number, CardImageSide> = {};
       portfolios.forEach((card) => {
         const selected = prev[card.portfolio_id];
-        if (selected === "before" && card.before_image_url) {
-          next[card.portfolio_id] = "before";
-          return;
-        }
-        if (selected === "after" && card.after_image_url) {
-          next[card.portfolio_id] = "after";
+        if (selected === "before" || selected === "after") {
+          next[card.portfolio_id] = selected;
           return;
         }
         const fallback = defaultImageSide(card);
@@ -298,6 +303,16 @@ export default function App() {
       return next;
     });
   }, [portfolios]);
+
+  useEffect(() => {
+    if (selectedPinnedPortfolioId == null) return;
+    if (portfolios.some((x) => x.portfolio_id === selectedPinnedPortfolioId)) return;
+    setSelectedPinnedPortfolioId(null);
+  }, [portfolios, selectedPinnedPortfolioId]);
+
+  useEffect(() => {
+    setSelectedPinnedPortfolioId(null);
+  }, [selectedUnitType?.unit_type_id]);
 
   const unitTypeButtons = useMemo(() => selectedComplex?.unit_types ?? [], [selectedComplex]);
 
@@ -317,6 +332,40 @@ export default function App() {
   const selectedFloorPlanImage = useMemo(() => {
     return selectedUnitType?.floor_plan_image_url || SAMPLE_FLOOR_PLAN_URL;
   }, [selectedUnitType]);
+
+  const floorPlanPins = useMemo<FloorPin[]>(() => {
+    const pins: FloorPin[] = [];
+    portfolios.forEach((card) => {
+      const before = fallbackFloorPin(card.portfolio_id, "before");
+      const after = fallbackFloorPin(card.portfolio_id, "after");
+      pins.push({
+        portfolioId: card.portfolio_id,
+        side: "before",
+        x: card.floor_plan_before_x ?? before.x,
+        y: card.floor_plan_before_y ?? before.y,
+      });
+      pins.push({
+        portfolioId: card.portfolio_id,
+        side: "after",
+        x: card.floor_plan_after_x ?? after.x,
+        y: card.floor_plan_after_y ?? after.y,
+      });
+    });
+    return pins;
+  }, [portfolios]);
+
+  function onFloorPinSelect(portfolioId: number, side: CardImageSide) {
+    setSelectedCardImages((prev) => ({ ...prev, [portfolioId]: side }));
+    setSelectedPinnedPortfolioId(portfolioId);
+    setMobilePanel("list");
+    setHighlightList(true);
+    window.requestAnimationFrame(() => {
+      const container = cardsRef.current;
+      if (!container) return;
+      const el = container.querySelector<HTMLElement>(`[data-portfolio-id="${portfolioId}"]`);
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }
 
   async function handleSelectComplex(complexId: number, fromMap = false) {
     setStatus("단지 정보를 불러오는 중입니다.");
@@ -613,6 +662,24 @@ export default function App() {
                     img.src = SAMPLE_FLOOR_PLAN_URL;
                   }}
                 />
+                <div className="floor-plan-pin-layer">
+                  {floorPlanPins.map((pin) => {
+                    const active =
+                      selectedPinnedPortfolioId === pin.portfolioId && selectedCardImages[pin.portfolioId] === pin.side;
+                    return (
+                      <button
+                        key={`${pin.portfolioId}-${pin.side}`}
+                        type="button"
+                        className={active ? "floor-plan-pin active" : "floor-plan-pin"}
+                        style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                        onClick={() => onFloorPinSelect(pin.portfolioId, pin.side)}
+                        title={`${pin.side === "before" ? "Before" : "After"} · #${pin.portfolioId}`}
+                      >
+                        {pin.side === "before" ? "B" : "A"}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </section>
           ) : null}
@@ -621,12 +688,19 @@ export default function App() {
 
           <div ref={cardsRef} className={highlightList ? "cards cards-highlight" : "cards"}>
             {portfolios.map((card) => (
-              <article key={card.portfolio_id} className="portfolio-card">
+              <article
+                key={card.portfolio_id}
+                data-portfolio-id={card.portfolio_id}
+                className={selectedPinnedPortfolioId === card.portfolio_id ? "portfolio-card active" : "portfolio-card"}
+              >
                 <div className="thumbs">
                   <button
                     type="button"
                     className={selectedCardImages[card.portfolio_id] === "before" ? "thumb selected" : "thumb"}
-                    onClick={() => setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "before" }))}
+                    onClick={() => {
+                      setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "before" }));
+                      setSelectedPinnedPortfolioId(card.portfolio_id);
+                    }}
                   >
                     <img
                       src={card.before_image_url || sampleBeforeUrl(card.portfolio_id)}
@@ -645,7 +719,10 @@ export default function App() {
                   <button
                     type="button"
                     className={selectedCardImages[card.portfolio_id] === "after" ? "thumb selected" : "thumb"}
-                    onClick={() => setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "after" }))}
+                    onClick={() => {
+                      setSelectedCardImages((prev) => ({ ...prev, [card.portfolio_id]: "after" }));
+                      setSelectedPinnedPortfolioId(card.portfolio_id);
+                    }}
                   >
                     <img
                       src={card.after_image_url || sampleAfterUrl(card.portfolio_id)}

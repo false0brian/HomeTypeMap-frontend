@@ -536,6 +536,7 @@ body {
 }
 
 .floor-plan-image-wrap {
+  position: relative;
   border: 1px solid #cad8c9;
   border-radius: 12px;
   overflow: hidden;
@@ -547,6 +548,31 @@ body {
   width: 100%;
   height: 168px;
   object-fit: cover;
+}
+
+.floor-plan-pin-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.floor-plan-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  background: #325f8c;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.floor-plan-pin.active {
+  background: #226f54;
+  outline: 2px solid #b7ddcb;
 }
 
 .cards {
@@ -573,6 +599,11 @@ body {
   padding: 10px;
   margin-bottom: 10px;
   background: linear-gradient(145deg, #fcfff7, #f7f9f0);
+}
+
+.portfolio-card.active {
+  border-color: #74b097;
+  box-shadow: 0 0 0 2px rgba(116, 176, 151, 0.2);
 }
 
 .thumbs {

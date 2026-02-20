@@ -117,6 +117,35 @@ export interface AdminPortfolioCreateInput {
   status: PublishStatus;
 }
 
+export interface AdminFloorPlanPin {
+  pin_id: number;
+  portfolio_id: number;
+  x_ratio: number;
+  y_ratio: number;
+  title?: string | null;
+  sort_order: number;
+  before_image_urls: string[];
+  after_image_urls: string[];
+}
+
+export interface AdminFloorPlanPinCreateInput {
+  x_ratio: number;
+  y_ratio: number;
+  title?: string;
+  sort_order: number;
+  before_image_urls: string[];
+  after_image_urls: string[];
+}
+
+export interface AdminFloorPlanPinUpdateInput {
+  x_ratio?: number;
+  y_ratio?: number;
+  title?: string;
+  sort_order?: number;
+  before_image_urls?: string[];
+  after_image_urls?: string[];
+}
+
 export interface AdminBlogPost {
   post_id: number;
   vendor_id?: number | null;

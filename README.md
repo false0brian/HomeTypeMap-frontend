@@ -30,8 +30,5 @@ npm run build
 - `src/types.ts`: DTO 타입
 - `src/styles.css`: 디자인 시스템/컴포넌트 스타일
 
-## CI
-- GitHub Actions: `.github/workflows/frontend-ci.yml`
-
 ## Sync Policy
 - 모노레포/백엔드 저장소와 동기화 규칙은 `docs/repo-sync-policy.md` 참고

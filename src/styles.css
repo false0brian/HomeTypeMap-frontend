@@ -755,6 +755,71 @@ button {
   cursor: not-allowed;
 }
 
+.quote-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 30, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 16px;
+}
+
+.quote-modal {
+  width: min(560px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.quote-modal h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.quote-modal p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quote-modal textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.quote-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.quote-modal-actions button {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+}
+
+.quote-modal-actions .ghost {
+  background: #fff;
+  color: #2f4255;
+}
+
+.quote-modal-actions .solid {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
 .state {
   margin: 10px 14px;
   color: var(--muted);

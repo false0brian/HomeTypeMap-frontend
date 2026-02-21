@@ -170,6 +170,9 @@ export default function App() {
   const [savedPortfolioIds, setSavedPortfolioIds] = useState<number[]>([]);
   const [quotedPortfolioIds, setQuotedPortfolioIds] = useState<number[]>([]);
   const [actionNotice, setActionNotice] = useState<{ tone: "ok" | "error"; message: string } | null>(null);
+  const [quoteModalCard, setQuoteModalCard] = useState<PortfolioCard | null>(null);
+  const [quoteMessage, setQuoteMessage] = useState("");
+  const [quoteSubmitting, setQuoteSubmitting] = useState(false);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -706,23 +709,41 @@ export default function App() {
     }
   }
 
-  async function onQuote(card: PortfolioCard) {
+  function openQuoteModal(card: PortfolioCard) {
+    setQuoteModalCard(card);
+    setQuoteMessage(`${card.title} 관련 상담 요청`);
+  }
+
+  function closeQuoteModal() {
+    if (quoteSubmitting) return;
+    setQuoteModalCard(null);
+    setQuoteMessage("");
+  }
+
+  async function submitQuote() {
+    const card = quoteModalCard;
+    if (!card) return;
     if (!userKey.trim()) {
       setActionNotice({ tone: "error", message: "user_key를 입력하세요." });
       return;
     }
 
     try {
+      setQuoteSubmitting(true);
       await requestQuote({
         userKey: userKey.trim(),
         vendorId: card.vendor_id ?? undefined,
         portfolioId: card.portfolio_id,
-        message: `${card.title} 관련 상담 요청`,
+        message: quoteMessage.trim() || `${card.title} 관련 상담 요청`,
       });
       setQuotedPortfolioIds((prev) => (prev.includes(card.portfolio_id) ? prev : [...prev, card.portfolio_id]));
       setActionNotice({ tone: "ok", message: "문의가 접수되었습니다." });
+      setQuoteModalCard(null);
+      setQuoteMessage("");
     } catch (e) {
       setActionNotice({ tone: "error", message: e instanceof Error ? e.message : "문의 접수에 실패했습니다." });
+    } finally {
+      setQuoteSubmitting(false);
     }
   }
 
@@ -1000,7 +1021,7 @@ export default function App() {
                   <button className="ghost" onClick={() => onFavorite(card.portfolio_id)}>
                     {savedPortfolioIds.includes(card.portfolio_id) ? "저장됨" : "저장"}
                   </button>
-                  <button className="solid" onClick={() => onQuote(card)} disabled={quotedPortfolioIds.includes(card.portfolio_id)}>
+                  <button className="solid" onClick={() => openQuoteModal(card)} disabled={quotedPortfolioIds.includes(card.portfolio_id)}>
                     {quotedPortfolioIds.includes(card.portfolio_id) ? "문의완료" : "문의"}
                   </button>
                 </div>
@@ -1010,6 +1031,26 @@ export default function App() {
           </div>
         </section>
       </main>
+      {quoteModalCard ? (
+        <div className="quote-modal-backdrop" onClick={closeQuoteModal}>
+          <section className="quote-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>문의 보내기</h3>
+            <p>{quoteModalCard.title}</p>
+            <textarea
+              value={quoteMessage}
+              onChange={(e) => setQuoteMessage(e.target.value)}
+              placeholder="문의 내용을 입력하세요."
+              rows={5}
+            />
+            <div className="quote-modal-actions">
+              <button className="ghost" onClick={closeQuoteModal} disabled={quoteSubmitting}>취소</button>
+              <button className="solid" onClick={() => void submitQuote()} disabled={quoteSubmitting}>
+                {quoteSubmitting ? "전송 중..." : "문의 전송"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

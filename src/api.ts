@@ -49,7 +49,10 @@ function adminHeaders(adminKey: string) {
   };
 }
 
-export async function fetchMapPins(bounds: BoundsQuery, vendorId?: number): Promise<MapPinsResponse> {
+export async function fetchMapPins(
+  bounds: BoundsQuery,
+  filters?: Pick<PortfolioFilters, "vendor_id" | "work_scope" | "min_area">,
+): Promise<MapPinsResponse> {
   const query: Record<string, string> = {
     south: String(bounds.south),
     west: String(bounds.west),
@@ -57,7 +60,9 @@ export async function fetchMapPins(bounds: BoundsQuery, vendorId?: number): Prom
     east: String(bounds.east),
     zoom: String(bounds.zoom),
   };
-  if (vendorId !== undefined) query.vendor_id = String(vendorId);
+  if (filters?.vendor_id !== undefined) query.vendor_id = String(filters.vendor_id);
+  if (filters?.work_scope) query.work_scope = filters.work_scope;
+  if (filters?.min_area !== undefined) query.min_area = String(filters.min_area);
   const url = buildUrl("/map/pins", query);
   const res = await fetch(url);
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch map pins"));
@@ -68,14 +73,16 @@ export async function fetchNearbyComplexes(
   latitude: number,
   longitude: number,
   radiusM: number,
-  vendorId?: number,
+  filters?: Pick<PortfolioFilters, "vendor_id" | "work_scope" | "min_area">,
 ): Promise<NearbyComplexesResponse> {
   const query: Record<string, string> = {
     lat: String(latitude),
     lng: String(longitude),
     radius_m: String(radiusM),
   };
-  if (vendorId !== undefined) query.vendor_id = String(vendorId);
+  if (filters?.vendor_id !== undefined) query.vendor_id = String(filters.vendor_id);
+  if (filters?.work_scope) query.work_scope = filters.work_scope;
+  if (filters?.min_area !== undefined) query.min_area = String(filters.min_area);
   const res = await fetch(
     buildUrl("/map/nearby", query),
   );

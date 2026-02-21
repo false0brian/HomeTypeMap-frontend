@@ -269,7 +269,11 @@ export default function App() {
       if (!mapRef.current) return;
       setLoadingMap(true);
       try {
-        const data = await fetchMapPins(bounds, effectiveVendorId);
+        const data = await fetchMapPins(bounds, {
+          vendor_id: effectiveVendorId,
+          work_scope: filters.work_scope,
+          min_area: filters.min_area,
+        });
         if (cancelled) return;
         setClusters(data.clusters);
         setComplexes(data.complexes);
@@ -286,7 +290,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(id);
     };
-  }, [bounds, mapMode, effectiveVendorId]);
+  }, [bounds, mapMode, effectiveVendorId, filters.work_scope, filters.min_area]);
 
   useEffect(() => {
     const layer = userLayerRef.current;
@@ -605,12 +609,11 @@ export default function App() {
     const run = async () => {
       setLoadingMap(true);
       try {
-        const data = await fetchNearbyComplexes(
-          userLocation.latitude,
-          userLocation.longitude,
-          nearbyRadiusM,
-          effectiveVendorId,
-        );
+        const data = await fetchNearbyComplexes(userLocation.latitude, userLocation.longitude, nearbyRadiusM, {
+          vendor_id: effectiveVendorId,
+          work_scope: filters.work_scope,
+          min_area: filters.min_area,
+        });
         if (cancelled) return;
         setClusters([]);
         setComplexes(data.items);
@@ -627,7 +630,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [mapMode, userLocation, nearbyRadiusM, effectiveVendorId]);
+  }, [mapMode, userLocation, nearbyRadiusM, effectiveVendorId, filters.work_scope, filters.min_area]);
 
   function clearQuickFilters() {
     setFilters((prev) => ({ ...prev, work_scope: undefined, min_area: undefined }));
@@ -717,7 +720,7 @@ export default function App() {
     <div className="page">
       <header className="topbar">
         <div className="title-wrap">
-          <h1>HomeTypeMap</h1>
+          <h1>PlaniFit</h1>
           <p>지도에서 평형 타입별 인테리어 사례를 한 번에 탐색</p>
         </div>
         <div className="top-actions">

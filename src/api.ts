@@ -49,14 +49,16 @@ function adminHeaders(adminKey: string) {
   };
 }
 
-export async function fetchMapPins(bounds: BoundsQuery): Promise<MapPinsResponse> {
-  const url = buildUrl("/map/pins", {
+export async function fetchMapPins(bounds: BoundsQuery, vendorId?: number): Promise<MapPinsResponse> {
+  const query: Record<string, string> = {
     south: String(bounds.south),
     west: String(bounds.west),
     north: String(bounds.north),
     east: String(bounds.east),
     zoom: String(bounds.zoom),
-  });
+  };
+  if (vendorId !== undefined) query.vendor_id = String(vendorId);
+  const url = buildUrl("/map/pins", query);
   const res = await fetch(url);
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch map pins"));
   return res.json();
@@ -66,13 +68,16 @@ export async function fetchNearbyComplexes(
   latitude: number,
   longitude: number,
   radiusM: number,
+  vendorId?: number,
 ): Promise<NearbyComplexesResponse> {
+  const query: Record<string, string> = {
+    lat: String(latitude),
+    lng: String(longitude),
+    radius_m: String(radiusM),
+  };
+  if (vendorId !== undefined) query.vendor_id = String(vendorId);
   const res = await fetch(
-    buildUrl("/map/nearby", {
-      lat: String(latitude),
-      lng: String(longitude),
-      radius_m: String(radiusM),
-    }),
+    buildUrl("/map/nearby", query),
   );
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch nearby complexes"));
   return res.json();

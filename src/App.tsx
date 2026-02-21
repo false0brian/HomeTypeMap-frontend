@@ -33,6 +33,7 @@ const DEFAULT_CENTER: L.LatLngExpression = [37.4875, 127.1022];
 const DEFAULT_FILTERS: PortfolioFilters = {};
 const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=Sample+Floor+Plan";
 const FAVORITE_VENDOR_IDS_KEY = "hometypemap.favorite_vendor_ids";
+const AUTO_FAVORITE_VENDOR_KEY = "hometypemap.auto_favorite_vendor_filter";
 
 type MobilePanel = "map" | "list";
 type MapMode = "bounds" | "nearby";
@@ -170,6 +171,7 @@ export default function App() {
   const [gallerySide, setGallerySide] = useState<CardImageSide>("after");
   const [vendorSearch, setVendorSearch] = useState("");
   const [favoriteVendorIds, setFavoriteVendorIds] = useState<number[]>([]);
+  const [autoFavoriteVendorFilter, setAutoFavoriteVendorFilter] = useState(true);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -240,6 +242,30 @@ export default function App() {
   }, [favoriteVendorIds]);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(AUTO_FAVORITE_VENDOR_KEY);
+      if (!raw) return;
+      setAutoFavoriteVendorFilter(raw === "1");
+    } catch {
+      // ignore localStorage read errors
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(AUTO_FAVORITE_VENDOR_KEY, autoFavoriteVendorFilter ? "1" : "0");
+  }, [autoFavoriteVendorFilter]);
+
+  const effectiveVendorId = useMemo(
+    () => filters.vendor_id ?? (autoFavoriteVendorFilter ? favoriteVendorIds[0] : undefined),
+    [filters.vendor_id, autoFavoriteVendorFilter, favoriteVendorIds],
+  );
+
+  const resolvedFilters = useMemo(
+    () => ({ ...filters, vendor_id: effectiveVendorId }),
+    [filters, effectiveVendorId],
+  );
+
+  useEffect(() => {
     if (mapMode !== "bounds") return;
 
     let cancelled = false;
@@ -248,7 +274,7 @@ export default function App() {
       if (!mapRef.current) return;
       setLoadingMap(true);
       try {
-        const data = await fetchMapPins(bounds);
+        const data = await fetchMapPins(bounds, effectiveVendorId);
         if (cancelled) return;
         setClusters(data.clusters);
         setComplexes(data.complexes);
@@ -266,7 +292,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(id);
     };
-  }, [bounds, mapMode]);
+  }, [bounds, mapMode, effectiveVendorId]);
 
   useEffect(() => {
     const layer = userLayerRef.current;
@@ -327,7 +353,7 @@ export default function App() {
       setLoadingPortfolios(true);
       setStatus("포트폴리오를 조회 중입니다.");
       try {
-        const data = await fetchPortfolios(selectedComplex.complex_id, selectedUnitType.unit_type_id, filters);
+        const data = await fetchPortfolios(selectedComplex.complex_id, selectedUnitType.unit_type_id, resolvedFilters);
         if (cancelled) return;
         setPortfolios(data.items);
         setStatus(`조회 완료: ${data.total}건`);
@@ -346,7 +372,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedComplex, selectedUnitType, filters, highlightList]);
+  }, [selectedComplex, selectedUnitType, resolvedFilters, highlightList]);
 
   useEffect(() => {
     if (!highlightList) return;
@@ -389,9 +415,14 @@ export default function App() {
     if (filters.work_scope) chips.push({ key: "work_scope", label: `범위 ${filters.work_scope}` });
     if (filters.min_area !== undefined) chips.push({ key: "min_area", label: `최소평형 ${filters.min_area}` });
     if (filters.budget_max_krw !== undefined) chips.push({ key: "budget_max_krw", label: `예산상한 ${filters.budget_max_krw.toLocaleString()}원` });
-    if (filters.vendor_id !== undefined) chips.push({ key: "vendor_id", label: `업체 #${filters.vendor_id}` });
+    if (effectiveVendorId !== undefined) {
+      chips.push({
+        key: "vendor_id",
+        label: `${filters.vendor_id !== undefined ? "업체" : "즐겨찾기 업체"} #${effectiveVendorId}`,
+      });
+    }
     return chips;
-  }, [filters]);
+  }, [filters, effectiveVendorId]);
 
   const vendorChips = useMemo(() => {
     const map = new Map<number, { vendorId: number; name: string; count: number; favorite: boolean }>();
@@ -412,16 +443,16 @@ export default function App() {
         if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
         return b.count - a.count || a.vendorId - b.vendorId;
       });
-    if (filters.vendor_id !== undefined && !map.has(filters.vendor_id)) {
+    if (effectiveVendorId !== undefined && !map.has(effectiveVendorId)) {
       items.unshift({
-        vendorId: filters.vendor_id,
-        name: `업체 #${filters.vendor_id}`,
+        vendorId: effectiveVendorId,
+        name: `업체 #${effectiveVendorId}`,
         count: 0,
-        favorite: favoriteVendorIds.includes(filters.vendor_id),
+        favorite: favoriteVendorIds.includes(effectiveVendorId),
       });
     }
     return items;
-  }, [portfolios, filters.vendor_id, vendorSearch, favoriteVendorIds]);
+  }, [portfolios, effectiveVendorId, vendorSearch, favoriteVendorIds]);
 
   const selectedDistance = useMemo(() => {
     if (!selectedComplex) return null;
@@ -579,7 +610,11 @@ export default function App() {
   function selectVendorChip(vendorId?: number) {
     setFilters((prev) => ({ ...prev, vendor_id: vendorId }));
     if (vendorId == null) {
-      setStatus("전체 업체 사례를 표시합니다.");
+      if (autoFavoriteVendorFilter && favoriteVendorIds.length > 0) {
+        setStatus(`즐겨찾기 업체 자동 적용: 업체 #${favoriteVendorIds[0]}`);
+      } else {
+        setStatus("전체 업체 사례를 표시합니다.");
+      }
       return;
     }
     const vendor = vendorChips.find((x) => x.vendorId === vendorId);
@@ -591,6 +626,36 @@ export default function App() {
       prev.includes(vendorId) ? prev.filter((x) => x !== vendorId) : [...prev, vendorId],
     );
   }
+
+  useEffect(() => {
+    if (mapMode !== "nearby" || !userLocation) return;
+    let cancelled = false;
+    const run = async () => {
+      setLoadingMap(true);
+      try {
+        const data = await fetchNearbyComplexes(
+          userLocation.latitude,
+          userLocation.longitude,
+          nearbyRadiusM,
+          effectiveVendorId,
+        );
+        if (cancelled) return;
+        setClusters([]);
+        setComplexes(data.items);
+        const vendorLabel = effectiveVendorId ? ` · 업체 #${effectiveVendorId}` : "";
+        setStatus(`내 위치 기준 ${Math.round(nearbyRadiusM / 1000)}km 내 ${data.items.length}개 단지${vendorLabel}`);
+      } catch (e) {
+        if (cancelled) return;
+        setStatus(e instanceof Error ? e.message : "근처 단지를 불러오지 못했습니다.");
+      } finally {
+        if (!cancelled) setLoadingMap(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [mapMode, userLocation, nearbyRadiusM, effectiveVendorId]);
 
   function resetFilters() {
     setWorkScopeDraft("");
@@ -617,18 +682,8 @@ export default function App() {
             mapRef.current.setView([latitude, longitude], Math.max(14, mapRef.current.getZoom()));
           }
 
-          setLoadingMap(true);
-          try {
-            const data = await fetchNearbyComplexes(latitude, longitude, nearbyRadiusM);
-            setMapMode("nearby");
-            setClusters([]);
-            setComplexes(data.items);
-            setStatus(`내 위치 기준 ${Math.round(nearbyRadiusM / 1000)}km 내 ${data.items.length}개 단지`);
-          } catch (e) {
-            setStatus(e instanceof Error ? e.message : "근처 단지를 불러오지 못했습니다.");
-          } finally {
-            setLoadingMap(false);
-          }
+          setMapMode("nearby");
+          setStatus("근처 단지를 조회하는 중입니다.");
         })();
       },
       (err) => {
@@ -813,6 +868,13 @@ export default function App() {
             })}
           </div>
           <div className="vendor-chips">
+            <button
+              className={autoFavoriteVendorFilter ? "chip active" : "chip"}
+              onClick={() => setAutoFavoriteVendorFilter((prev) => !prev)}
+              title="수동 업체 선택이 없으면 즐겨찾기 첫 업체를 자동 적용"
+            >
+              즐겨찾기 자동
+            </button>
             <input
               className="vendor-search"
               value={vendorSearch}

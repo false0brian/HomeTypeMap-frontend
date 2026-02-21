@@ -167,6 +167,9 @@ export default function App() {
   const [vendorSearch, setVendorSearch] = useState("");
   const [favoriteVendorIds, setFavoriteVendorIds] = useState<number[]>([]);
   const [autoFavoriteVendorFilter, setAutoFavoriteVendorFilter] = useState(true);
+  const [savedPortfolioIds, setSavedPortfolioIds] = useState<number[]>([]);
+  const [quotedPortfolioIds, setQuotedPortfolioIds] = useState<number[]>([]);
+  const [actionNotice, setActionNotice] = useState<{ tone: "ok" | "error"; message: string } | null>(null);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -518,6 +521,12 @@ export default function App() {
     [selectedFloorPin],
   );
 
+  useEffect(() => {
+    if (!actionNotice) return;
+    const timer = window.setTimeout(() => setActionNotice(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [actionNotice]);
+
   function firstPinIdForPortfolio(portfolioId: number): string {
     const first = floorPlanPins.find((x) => x.portfolioId === portfolioId);
     return first?.pinId ?? `${portfolioId}-pin-1`;
@@ -678,21 +687,28 @@ export default function App() {
 
   async function onFavorite(portfolioId: number) {
     if (!userKey.trim()) {
-      setStatus("사용자 키를 입력하세요.");
+      setActionNotice({ tone: "error", message: "user_key를 입력하세요." });
       return;
     }
 
     try {
       await saveFavorite(userKey.trim(), portfolioId);
-      setStatus("즐겨찾기에 저장했습니다.");
-    } catch {
-      setStatus("즐겨찾기 저장에 실패했습니다.");
+      setSavedPortfolioIds((prev) => (prev.includes(portfolioId) ? prev : [...prev, portfolioId]));
+      setActionNotice({ tone: "ok", message: "즐겨찾기에 저장했습니다." });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "즐겨찾기 저장 실패";
+      if (msg.includes("already exists")) {
+        setSavedPortfolioIds((prev) => (prev.includes(portfolioId) ? prev : [...prev, portfolioId]));
+        setActionNotice({ tone: "ok", message: "이미 즐겨찾기에 저장된 항목입니다." });
+        return;
+      }
+      setActionNotice({ tone: "error", message: msg });
     }
   }
 
   async function onQuote(card: PortfolioCard) {
     if (!userKey.trim()) {
-      setStatus("사용자 키를 입력하세요.");
+      setActionNotice({ tone: "error", message: "user_key를 입력하세요." });
       return;
     }
 
@@ -703,9 +719,10 @@ export default function App() {
         portfolioId: card.portfolio_id,
         message: `${card.title} 관련 상담 요청`,
       });
-      setStatus("문의가 접수되었습니다.");
-    } catch {
-      setStatus("문의 접수에 실패했습니다.");
+      setQuotedPortfolioIds((prev) => (prev.includes(card.portfolio_id) ? prev : [...prev, card.portfolio_id]));
+      setActionNotice({ tone: "ok", message: "문의가 접수되었습니다." });
+    } catch (e) {
+      setActionNotice({ tone: "error", message: e instanceof Error ? e.message : "문의 접수에 실패했습니다." });
     }
   }
 
@@ -759,6 +776,11 @@ export default function App() {
           </button>
         ))}
       </section>
+      {actionNotice ? (
+        <p className={actionNotice.tone === "ok" ? "action-notice ok" : "action-notice error"}>
+          {actionNotice.message}
+        </p>
+      ) : null}
 
       <main className="content">
         <section className="map-panel">
@@ -803,9 +825,9 @@ export default function App() {
             <button
               className={autoFavoriteVendorFilter ? "chip active" : "chip"}
               onClick={() => setAutoFavoriteVendorFilter((prev) => !prev)}
-              title="수동 업체 선택이 없으면 즐겨찾기 첫 업체를 자동 적용"
+              title="업체를 직접 고르지 않았을 때 즐겨찾기 업체를 자동으로 적용합니다."
             >
-              즐겨찾기 자동
+              즐겨찾기 업체 자동 적용
             </button>
             <input
               className="vendor-search"
@@ -838,6 +860,9 @@ export default function App() {
               </div>
             ))}
           </div>
+          <p className="vendor-help">
+            직접 업체를 고르지 않으면 즐겨찾기 업체가 자동 적용됩니다.
+          </p>
           {selectedUnitType ? (
             <section className="floor-plan-panel">
               <div className="floor-plan-head">
@@ -973,10 +998,10 @@ export default function App() {
                     같은 업체만
                   </button>
                   <button className="ghost" onClick={() => onFavorite(card.portfolio_id)}>
-                    저장
+                    {savedPortfolioIds.includes(card.portfolio_id) ? "저장됨" : "저장"}
                   </button>
-                  <button className="solid" onClick={() => onQuote(card)}>
-                    문의
+                  <button className="solid" onClick={() => onQuote(card)} disabled={quotedPortfolioIds.includes(card.portfolio_id)}>
+                    {quotedPortfolioIds.includes(card.portfolio_id) ? "문의완료" : "문의"}
                   </button>
                 </div>
               </article>

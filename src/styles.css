@@ -222,6 +222,27 @@ button {
   color: var(--primary-strong);
 }
 
+.action-notice {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+
+.action-notice.ok {
+  border-color: #b8ddd6;
+  background: #edf8f6;
+  color: #175e55;
+}
+
+.action-notice.error {
+  border-color: #e4c7c7;
+  background: #fdf3f3;
+  color: #9c2f2f;
+}
+
 .status-bar {
   margin: 0;
   border: 1px solid var(--line);
@@ -419,6 +440,13 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.vendor-help {
+  margin: 0;
+  padding: 8px 14px 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .vendor-fav {

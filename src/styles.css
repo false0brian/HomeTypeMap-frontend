@@ -549,6 +549,14 @@ body {
   overflow-x: auto;
 }
 
+.vendor-chips {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
 .chip {
   border: 1px solid var(--line);
   border-radius: 999px;

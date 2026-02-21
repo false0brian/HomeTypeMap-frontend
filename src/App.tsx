@@ -370,6 +370,25 @@ export default function App() {
     return chips;
   }, [filters]);
 
+  const vendorChips = useMemo(() => {
+    const map = new Map<number, { vendorId: number; name: string; count: number }>();
+    portfolios.forEach((card) => {
+      if (!card.vendor_id) return;
+      const next = map.get(card.vendor_id) ?? {
+        vendorId: card.vendor_id,
+        name: card.vendor_name ?? `업체 #${card.vendor_id}`,
+        count: 0,
+      };
+      next.count += 1;
+      map.set(card.vendor_id, next);
+    });
+    const items = Array.from(map.values()).sort((a, b) => b.count - a.count || a.vendorId - b.vendorId);
+    if (filters.vendor_id !== undefined && !map.has(filters.vendor_id)) {
+      items.unshift({ vendorId: filters.vendor_id, name: `업체 #${filters.vendor_id}`, count: 0 });
+    }
+    return items;
+  }, [portfolios, filters.vendor_id]);
+
   const selectedDistance = useMemo(() => {
     if (!selectedComplex) return null;
     return complexes.find((x) => x.complex_id === selectedComplex.complex_id)?.distance_m ?? null;
@@ -521,6 +540,16 @@ export default function App() {
     }
     setFilters((prev) => ({ ...prev, vendor_id: card.vendor_id ?? undefined }));
     setStatus(`${card.vendor_name ?? `업체 #${card.vendor_id}`} 사례만 표시합니다.`);
+  }
+
+  function selectVendorChip(vendorId?: number) {
+    setFilters((prev) => ({ ...prev, vendor_id: vendorId }));
+    if (vendorId == null) {
+      setStatus("전체 업체 사례를 표시합니다.");
+      return;
+    }
+    const vendor = vendorChips.find((x) => x.vendorId === vendorId);
+    setStatus(`${vendor?.name ?? `업체 #${vendorId}`} 사례만 표시합니다.`);
   }
 
   function resetFilters() {
@@ -742,6 +771,24 @@ export default function App() {
                 </button>
               );
             })}
+          </div>
+          <div className="vendor-chips">
+            <button
+              className={filters.vendor_id === undefined ? "chip active" : "chip"}
+              onClick={() => selectVendorChip(undefined)}
+            >
+              전체 업체
+            </button>
+            {vendorChips.map((vendor) => (
+              <button
+                key={vendor.vendorId}
+                className={filters.vendor_id === vendor.vendorId ? "chip active" : "chip"}
+                onClick={() => selectVendorChip(vendor.vendorId)}
+              >
+                {vendor.name}
+                <em>{vendor.count}</em>
+              </button>
+            ))}
           </div>
           {selectedUnitType ? (
             <section className="floor-plan-panel">

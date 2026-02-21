@@ -312,7 +312,7 @@ export default function App() {
       markerLayerRef.current = null;
       userLayerRef.current = null;
     };
-  }, []);
+  }, [currentUser, guestMode]);
 
   useEffect(() => {
     const map = mapRef.current;

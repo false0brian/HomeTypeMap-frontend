@@ -35,7 +35,6 @@ const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=S
 const FAVORITE_VENDOR_IDS_KEY = "hometypemap.favorite_vendor_ids";
 const AUTO_FAVORITE_VENDOR_KEY = "hometypemap.auto_favorite_vendor_filter";
 
-type MobilePanel = "map" | "list";
 type MapMode = "bounds" | "nearby";
 type CardImageSide = "before" | "after";
 type FloorPin = {
@@ -161,7 +160,6 @@ export default function App() {
   const [status, setStatus] = useState<string>("지도를 초기화하는 중입니다.");
 
   const [mapMode, setMapMode] = useState<MapMode>("bounds");
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("map");
   const [highlightList, setHighlightList] = useState(false);
   const [nearbyRadiusM, setNearbyRadiusM] = useState(3000);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -172,6 +170,7 @@ export default function App() {
   const [vendorSearch, setVendorSearch] = useState("");
   const [favoriteVendorIds, setFavoriteVendorIds] = useState<number[]>([]);
   const [autoFavoriteVendorFilter, setAutoFavoriteVendorFilter] = useState(true);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -534,7 +533,6 @@ export default function App() {
     setSelectedPinnedPortfolioId(portfolioId);
     setSelectedFloorPinId(pin.pinId);
     setGallerySide(defaultSide);
-    setMobilePanel("list");
     setHighlightList(true);
     window.requestAnimationFrame(() => {
       const container = cardsRef.current;
@@ -552,7 +550,6 @@ export default function App() {
       const first = detail.unit_types[0] ?? null;
       setSelectedUnitType(first);
       if (fromMap) {
-        setMobilePanel("list");
         setHighlightList(true);
       }
       if (!first) {
@@ -762,6 +759,12 @@ export default function App() {
           <p>지도에서 평형 타입별 인테리어 사례를 한 번에 탐색</p>
         </div>
         <div className="top-actions">
+          <button
+            className={showAdvancedFilters ? "top-filter-toggle active" : "top-filter-toggle"}
+            onClick={() => setShowAdvancedFilters((prev) => !prev)}
+          >
+            필터
+          </button>
           <label className="user-key">
             user_key
             <input value={userKey} onChange={(e) => setUserKey(e.target.value)} placeholder="demo-user" />
@@ -774,56 +777,53 @@ export default function App() {
         </div>
       </header>
 
-      <section className="filter-row">
-        <label>
-          공사범위
-          <select value={workScopeDraft} onChange={(e) => setWorkScopeDraft((e.target.value as WorkScopeType) || "")}>
-            <option value="">전체</option>
-            <option value="full_remodeling">전체 리모델링</option>
-            <option value="partial">부분 공사</option>
-            <option value="kitchen">주방</option>
-            <option value="bathroom">욕실</option>
-          </select>
-        </label>
-        <label>
-          최소 평형(m2)
-          <input type="number" placeholder="59" value={minAreaDraft} onChange={(e) => setMinAreaDraft(e.target.value)} />
-        </label>
-        <label>
-          예산 상한(원)
-          <input
-            type="number"
-            placeholder="50000000"
-            value={budgetMaxDraft}
-            onChange={(e) => setBudgetMaxDraft(e.target.value)}
-          />
-        </label>
-        <div className="filter-buttons">
-          <button className="apply" onClick={applyFilters}>필터 적용</button>
-          <button className="reset" onClick={resetFilters}>필터 초기화</button>
-        </div>
-      </section>
+      {showAdvancedFilters ? (
+        <>
+          <section className="filter-row">
+            <label>
+              공사범위
+              <select value={workScopeDraft} onChange={(e) => setWorkScopeDraft((e.target.value as WorkScopeType) || "")}>
+                <option value="">전체</option>
+                <option value="full_remodeling">전체 리모델링</option>
+                <option value="partial">부분 공사</option>
+                <option value="kitchen">주방</option>
+                <option value="bathroom">욕실</option>
+              </select>
+            </label>
+            <label>
+              최소 평형(m2)
+              <input type="number" placeholder="59" value={minAreaDraft} onChange={(e) => setMinAreaDraft(e.target.value)} />
+            </label>
+            <label>
+              예산 상한(원)
+              <input
+                type="number"
+                placeholder="50000000"
+                value={budgetMaxDraft}
+                onChange={(e) => setBudgetMaxDraft(e.target.value)}
+              />
+            </label>
+            <div className="filter-buttons">
+              <button className="apply" onClick={applyFilters}>필터 적용</button>
+              <button className="reset" onClick={resetFilters}>필터 초기화</button>
+            </div>
+          </section>
 
-      <section className="preset-row">
-        <button onClick={() => applyPreset("partial")}>부분공사</button>
-        <button onClick={() => applyPreset("budget20")}>2천만 이하</button>
-        <button onClick={() => applyPreset("area59")}>59m2 이상</button>
-        {activeFilterChips.map((chip) => (
-          <button key={chip.key} className="active-chip" onClick={() => clearFilter(chip.key)}>
-            {chip.label} ×
-          </button>
-        ))}
-      </section>
-
-      <p className="status-bar">{status}</p>
-
-      <section className="mobile-panel-tabs">
-        <button className={mobilePanel === "map" ? "tab active" : "tab"} onClick={() => setMobilePanel("map")}>지도</button>
-        <button className={mobilePanel === "list" ? "tab active" : "tab"} onClick={() => setMobilePanel("list")}>리스트</button>
-      </section>
+          <section className="preset-row">
+            <button onClick={() => applyPreset("partial")}>부분공사</button>
+            <button onClick={() => applyPreset("budget20")}>2천만 이하</button>
+            <button onClick={() => applyPreset("area59")}>59m2 이상</button>
+            {activeFilterChips.map((chip) => (
+              <button key={chip.key} className="active-chip" onClick={() => clearFilter(chip.key)}>
+                {chip.label} ×
+              </button>
+            ))}
+          </section>
+        </>
+      ) : null}
 
       <main className="content">
-        <section className={mobilePanel === "list" ? "map-panel mobile-hidden" : "map-panel"}>
+        <section className="map-panel">
           <div className="map-toolbar">
             <button onClick={resetMapView}>초기화</button>
             <button onClick={() => void focusNearby()}>내 위치 주변</button>
@@ -844,7 +844,7 @@ export default function App() {
           <div className="map-canvas" ref={mapContainerRef} />
         </section>
 
-        <section className={mobilePanel === "map" ? "sheet mobile-hidden" : "sheet"}>
+        <section className="sheet">
           <div className="sheet-head">
             <h2>{selectedComplex?.name ?? "단지를 선택하세요"}</h2>
             <p>{selectedComplex?.address ?? "지도에서 단지 핀을 클릭하면 상세가 열립니다."}</p>

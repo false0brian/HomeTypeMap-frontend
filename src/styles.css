@@ -90,6 +90,22 @@ button {
   gap: 10px;
 }
 
+.top-filter-toggle {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: #324558;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.top-filter-toggle.active {
+  border-color: var(--primary);
+  background: #eaf6f5;
+  color: var(--primary-strong);
+}
+
 .user-key {
   display: grid;
   gap: 5px;
@@ -220,7 +236,7 @@ button {
 .content {
   min-height: 0;
   display: grid;
-  grid-template-columns: 1.34fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -231,7 +247,7 @@ button {
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  min-height: 66vh;
+  min-height: 56vh;
 }
 
 .map-toolbar {
@@ -262,7 +278,7 @@ button {
 
 .map-canvas {
   position: relative;
-  height: calc(66vh - 54px);
+  height: calc(56vh - 54px);
   background:
     linear-gradient(90deg, rgba(37, 99, 235, 0.08) 1px, transparent 1px) 0 0 / 32px 32px,
     linear-gradient(rgba(15, 118, 110, 0.08) 1px, transparent 1px) 0 0 / 32px 32px,
@@ -348,6 +364,7 @@ button {
 .sheet {
   display: grid;
   grid-template-rows: auto auto auto 1fr;
+  min-height: 0;
 }
 
 .sheet-head {
@@ -571,6 +588,7 @@ button {
 .cards {
   overflow: auto;
   padding: 12px;
+  max-height: 46vh;
 }
 
 .cards-highlight {
@@ -933,7 +951,6 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .content,
   .admin-grid {
     grid-template-columns: 1fr;
   }
@@ -960,15 +977,19 @@ button {
   }
 
   .map-panel {
-    min-height: 45vh;
+    min-height: 44vh;
   }
 
   .map-canvas {
-    height: calc(45vh - 54px);
+    height: calc(44vh - 54px);
   }
 
   .sheet {
-    min-height: 52vh;
+    min-height: 0;
+  }
+
+  .cards {
+    max-height: none;
   }
 
   .admin-header {

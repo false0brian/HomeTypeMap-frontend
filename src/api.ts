@@ -101,6 +101,7 @@ export async function fetchPortfolios(
   if (filters.budget_max_krw !== undefined) query.budget_max_krw = String(filters.budget_max_krw);
   if (filters.work_scope) query.work_scope = filters.work_scope;
   if (filters.style) query.style = filters.style;
+  if (filters.vendor_id !== undefined) query.vendor_id = String(filters.vendor_id);
 
   const res = await fetch(buildUrl(`/complexes/${complexId}/portfolios`, query));
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch portfolios"));

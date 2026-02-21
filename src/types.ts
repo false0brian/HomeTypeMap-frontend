@@ -89,6 +89,7 @@ export interface PortfolioFilters {
   budget_max_krw?: number;
   work_scope?: WorkScopeType;
   style?: string;
+  vendor_id?: number;
 }
 
 export interface AdminPortfolio {

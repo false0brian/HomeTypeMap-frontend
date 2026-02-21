@@ -366,6 +366,7 @@ export default function App() {
     if (filters.work_scope) chips.push({ key: "work_scope", label: `범위 ${filters.work_scope}` });
     if (filters.min_area !== undefined) chips.push({ key: "min_area", label: `최소평형 ${filters.min_area}` });
     if (filters.budget_max_krw !== undefined) chips.push({ key: "budget_max_krw", label: `예산상한 ${filters.budget_max_krw.toLocaleString()}원` });
+    if (filters.vendor_id !== undefined) chips.push({ key: "vendor_id", label: `업체 #${filters.vendor_id}` });
     return chips;
   }, [filters]);
 
@@ -511,6 +512,15 @@ export default function App() {
     if (key === "work_scope") setWorkScopeDraft("");
     if (key === "min_area") setMinAreaDraft("");
     if (key === "budget_max_krw") setBudgetMaxDraft("");
+  }
+
+  function filterByVendor(card: PortfolioCard) {
+    if (!card.vendor_id) {
+      setStatus("이 사례는 업체 정보가 없어 업체별 필터를 적용할 수 없습니다.");
+      return;
+    }
+    setFilters((prev) => ({ ...prev, vendor_id: card.vendor_id ?? undefined }));
+    setStatus(`${card.vendor_name ?? `업체 #${card.vendor_id}`} 사례만 표시합니다.`);
   }
 
   function resetFilters() {
@@ -864,6 +874,9 @@ export default function App() {
                   <span>{card.work_scope}</span>
                 </div>
                 <div className="actions">
+                  <button className="ghost" onClick={() => filterByVendor(card)} disabled={!card.vendor_id}>
+                    같은 업체만
+                  </button>
                   <button className="ghost" onClick={() => onFavorite(card.portfolio_id)}>
                     저장
                   </button>

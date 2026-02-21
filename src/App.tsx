@@ -932,18 +932,18 @@ export default function App() {
 
   return (
     <div className="page">
-      <header className="topbar">
-        <div className="title-wrap">
+      <section className="topbar-stack">
+        <div className="logo-panel">
           <img className="top-logo" src="/logo.png" alt="PlaniFit logo" />
         </div>
-        <div className="top-actions">
+        <div className="auth-panel">
           {currentUser ? (
             <button className="logout-btn" onClick={() => void onLogout()}>로그아웃</button>
           ) : (
             <button className="logout-btn" onClick={() => setGuestMode(false)}>로그인 / 회원가입</button>
           )}
         </div>
-      </header>
+      </section>
 
       <section className="preset-row">
         <button className={filters.work_scope === "partial" ? "active-chip" : ""} onClick={() => toggleWorkScopeFilter("partial")}>

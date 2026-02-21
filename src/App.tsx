@@ -934,21 +934,11 @@ export default function App() {
     <div className="page">
       <header className="topbar">
         <div className="title-wrap">
-          <div className="title-brand">
-            <img className="top-logo" src="/logo.png" alt="PlaniFit logo" />
-            <h1>PlaniFit</h1>
-          </div>
-          <p>지도에서 평형 타입별 인테리어 사례를 한 번에 탐색</p>
+          <img className="top-logo" src="/logo.png" alt="PlaniFit logo" />
         </div>
         <div className="top-actions">
           {currentUser ? (
-            <>
-              <div className="user-badge">
-                <strong>{currentUser.display_name}</strong>
-                <span>{currentUser.email}</span>
-              </div>
-              <button className="logout-btn" onClick={() => void onLogout()}>로그아웃</button>
-            </>
+            <button className="logout-btn" onClick={() => void onLogout()}>로그아웃</button>
           ) : (
             <button className="logout-btn" onClick={() => setGuestMode(false)}>로그인 / 회원가입</button>
           )}

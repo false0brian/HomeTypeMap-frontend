@@ -70,23 +70,14 @@ button {
   gap: 12px;
 }
 
-.title-wrap h1 {
-  margin: 0;
-  font-family: "Manrope", sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  font-size: 30px;
-}
-
-.title-brand {
+.title-wrap {
   display: flex;
   align-items: center;
-  gap: 10px;
 }
 
 .top-logo {
-  width: 40px;
-  height: 40px;
+  width: 72px;
+  height: 72px;
   object-fit: contain;
   border-radius: 10px;
   border: 1px solid var(--line);
@@ -94,34 +85,10 @@ button {
   padding: 5px;
 }
 
-.title-wrap p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
 .top-actions {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.user-badge {
-  display: grid;
-  gap: 2px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  padding: 7px 10px;
-}
-
-.user-badge strong {
-  font-size: 12px;
-}
-
-.user-badge span {
-  font-size: 11px;
-  color: var(--muted);
 }
 
 .logout-btn {

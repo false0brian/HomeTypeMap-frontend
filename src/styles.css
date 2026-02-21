@@ -555,6 +555,35 @@ body {
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
+  align-items: center;
+}
+
+.vendor-search {
+  border: 1px solid #c7d3c4;
+  border-radius: 999px;
+  padding: 7px 10px;
+  min-width: 150px;
+  background: #fff;
+}
+
+.vendor-chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vendor-fav {
+  border: 1px solid #c7d3c4;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fff;
+  color: #5f6f66;
+  line-height: 1;
+}
+
+.vendor-fav.active {
+  border-color: #226f54;
+  color: #226f54;
 }
 
 .chip {

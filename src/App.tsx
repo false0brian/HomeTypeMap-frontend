@@ -32,6 +32,7 @@ const DEFAULT_BOUNDS: BoundsQuery = {
 const DEFAULT_CENTER: L.LatLngExpression = [37.4875, 127.1022];
 const DEFAULT_FILTERS: PortfolioFilters = {};
 const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=Sample+Floor+Plan";
+const FAVORITE_VENDOR_IDS_KEY = "hometypemap.favorite_vendor_ids";
 
 type MobilePanel = "map" | "list";
 type MapMode = "bounds" | "nearby";
@@ -167,6 +168,8 @@ export default function App() {
   const [selectedPinnedPortfolioId, setSelectedPinnedPortfolioId] = useState<number | null>(null);
   const [selectedFloorPinId, setSelectedFloorPinId] = useState<string | null>(null);
   const [gallerySide, setGallerySide] = useState<CardImageSide>("after");
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [favoriteVendorIds, setFavoriteVendorIds] = useState<number[]>([]);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -215,6 +218,26 @@ export default function App() {
       userLayerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(FAVORITE_VENDOR_IDS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const normalized = parsed
+          .map((x) => Number(x))
+          .filter((x) => Number.isInteger(x) && x > 0);
+        setFavoriteVendorIds(normalized);
+      }
+    } catch {
+      // ignore localStorage parse errors
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(FAVORITE_VENDOR_IDS_KEY, JSON.stringify(favoriteVendorIds));
+  }, [favoriteVendorIds]);
 
   useEffect(() => {
     if (mapMode !== "bounds") return;
@@ -371,23 +394,34 @@ export default function App() {
   }, [filters]);
 
   const vendorChips = useMemo(() => {
-    const map = new Map<number, { vendorId: number; name: string; count: number }>();
+    const map = new Map<number, { vendorId: number; name: string; count: number; favorite: boolean }>();
     portfolios.forEach((card) => {
       if (!card.vendor_id) return;
       const next = map.get(card.vendor_id) ?? {
         vendorId: card.vendor_id,
         name: card.vendor_name ?? `업체 #${card.vendor_id}`,
         count: 0,
+        favorite: favoriteVendorIds.includes(card.vendor_id),
       };
       next.count += 1;
       map.set(card.vendor_id, next);
     });
-    const items = Array.from(map.values()).sort((a, b) => b.count - a.count || a.vendorId - b.vendorId);
+    const items = Array.from(map.values())
+      .filter((x) => x.name.toLowerCase().includes(vendorSearch.toLowerCase()))
+      .sort((a, b) => {
+        if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+        return b.count - a.count || a.vendorId - b.vendorId;
+      });
     if (filters.vendor_id !== undefined && !map.has(filters.vendor_id)) {
-      items.unshift({ vendorId: filters.vendor_id, name: `업체 #${filters.vendor_id}`, count: 0 });
+      items.unshift({
+        vendorId: filters.vendor_id,
+        name: `업체 #${filters.vendor_id}`,
+        count: 0,
+        favorite: favoriteVendorIds.includes(filters.vendor_id),
+      });
     }
     return items;
-  }, [portfolios, filters.vendor_id]);
+  }, [portfolios, filters.vendor_id, vendorSearch, favoriteVendorIds]);
 
   const selectedDistance = useMemo(() => {
     if (!selectedComplex) return null;
@@ -550,6 +584,12 @@ export default function App() {
     }
     const vendor = vendorChips.find((x) => x.vendorId === vendorId);
     setStatus(`${vendor?.name ?? `업체 #${vendorId}`} 사례만 표시합니다.`);
+  }
+
+  function toggleFavoriteVendor(vendorId: number) {
+    setFavoriteVendorIds((prev) =>
+      prev.includes(vendorId) ? prev.filter((x) => x !== vendorId) : [...prev, vendorId],
+    );
   }
 
   function resetFilters() {
@@ -773,6 +813,12 @@ export default function App() {
             })}
           </div>
           <div className="vendor-chips">
+            <input
+              className="vendor-search"
+              value={vendorSearch}
+              onChange={(e) => setVendorSearch(e.target.value)}
+              placeholder="업체명 검색"
+            />
             <button
               className={filters.vendor_id === undefined ? "chip active" : "chip"}
               onClick={() => selectVendorChip(undefined)}
@@ -780,14 +826,22 @@ export default function App() {
               전체 업체
             </button>
             {vendorChips.map((vendor) => (
-              <button
-                key={vendor.vendorId}
-                className={filters.vendor_id === vendor.vendorId ? "chip active" : "chip"}
-                onClick={() => selectVendorChip(vendor.vendorId)}
-              >
-                {vendor.name}
-                <em>{vendor.count}</em>
-              </button>
+              <div key={vendor.vendorId} className="vendor-chip-item">
+                <button
+                  className={filters.vendor_id === vendor.vendorId ? "chip active" : "chip"}
+                  onClick={() => selectVendorChip(vendor.vendorId)}
+                >
+                  {vendor.name}
+                  <em>{vendor.count}</em>
+                </button>
+                <button
+                  className={vendor.favorite ? "vendor-fav active" : "vendor-fav"}
+                  onClick={() => toggleFavoriteVendor(vendor.vendorId)}
+                  title={vendor.favorite ? "즐겨찾기 해제" : "즐겨찾기"}
+                >
+                  {vendor.favorite ? "★" : "☆"}
+                </button>
+              </div>
             ))}
           </div>
           {selectedUnitType ? (

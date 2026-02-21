@@ -7,6 +7,7 @@ import AdminApp from "./AdminApp";
 import "./styles.css";
 
 const isAdminRoute = window.location.pathname.startsWith("/admin");
+document.title = isAdminRoute ? "PlaniFit Admin" : "PlaniFit";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

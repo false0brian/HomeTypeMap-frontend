@@ -2,15 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as L from "leaflet";
 
 import {
+  fetchMe,
   fetchComplexDetail,
+  login,
+  logout,
   fetchMapPins,
   fetchNearbyComplexes,
   fetchPortfolios,
   requestQuote,
   saveFavorite,
+  signup,
   type BoundsQuery,
 } from "./api";
 import type {
+  AuthUser,
   ClusterPin,
   ComplexDetailResponse,
   ComplexPin,
@@ -34,6 +39,7 @@ const DEFAULT_FILTERS: PortfolioFilters = {};
 const SAMPLE_FLOOR_PLAN_URL = "https://placehold.co/960x640/eef3ea/2b4b3e?text=Sample+Floor+Plan";
 const FAVORITE_VENDOR_IDS_KEY = "hometypemap.favorite_vendor_ids";
 const AUTO_FAVORITE_VENDOR_KEY = "hometypemap.auto_favorite_vendor_filter";
+const AUTH_TOKEN_KEY = "planifit.auth.token";
 
 type MapMode = "bounds" | "nearby";
 type CardImageSide = "before" | "after";
@@ -69,6 +75,12 @@ function cardSummary(card: PortfolioCard) {
   const duration = card.duration_days ? `${card.duration_days}일` : "기간 미정";
   const vendor = card.vendor_name ?? "업체 미지정";
   return `시공비 ${priceLabel(card.budget_min_krw, card.budget_max_krw)} · ${workScopeLabel(card.work_scope)} · ${duration} · ${vendor}`;
+}
+
+function formatDateTimeLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function defaultImageSide(card: PortfolioCard): CardImageSide | null {
@@ -150,7 +162,14 @@ export default function App() {
 
   const [filters, setFilters] = useState<PortfolioFilters>(DEFAULT_FILTERS);
 
-  const [userKey, setUserKey] = useState("demo-user");
+  const [authToken, setAuthToken] = useState("");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authDisplayName, setAuthDisplayName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [loadingMap, setLoadingMap] = useState(false);
   const [loadingPortfolios, setLoadingPortfolios] = useState(false);
@@ -186,6 +205,37 @@ export default function App() {
       zoom: map.getZoom(),
     });
   };
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!stored) return;
+    setAuthToken(stored);
+  }, []);
+
+  useEffect(() => {
+    if (!authToken) {
+      setCurrentUser(null);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const me = await fetchMe(authToken);
+        if (cancelled) return;
+        setCurrentUser(me);
+        window.localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+      } catch {
+        if (cancelled) return;
+        setCurrentUser(null);
+        setAuthToken("");
+        window.localStorage.removeItem(AUTH_TOKEN_KEY);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -689,13 +739,13 @@ export default function App() {
   }
 
   async function onFavorite(portfolioId: number) {
-    if (!userKey.trim()) {
-      setActionNotice({ tone: "error", message: "user_key를 입력하세요." });
+    if (!currentUser) {
+      setActionNotice({ tone: "error", message: "로그인이 필요합니다." });
       return;
     }
 
     try {
-      await saveFavorite(userKey.trim(), portfolioId);
+      await saveFavorite(currentUser.user_key, portfolioId);
       setSavedPortfolioIds((prev) => (prev.includes(portfolioId) ? prev : [...prev, portfolioId]));
       setActionNotice({ tone: "ok", message: "즐겨찾기에 저장했습니다." });
     } catch (e) {
@@ -723,21 +773,24 @@ export default function App() {
   async function submitQuote() {
     const card = quoteModalCard;
     if (!card) return;
-    if (!userKey.trim()) {
-      setActionNotice({ tone: "error", message: "user_key를 입력하세요." });
+    if (!currentUser) {
+      setActionNotice({ tone: "error", message: "로그인이 필요합니다." });
       return;
     }
 
     try {
       setQuoteSubmitting(true);
-      await requestQuote({
-        userKey: userKey.trim(),
+      const result = await requestQuote({
+        authToken,
+        userKey: currentUser.user_key,
+        requesterName: currentUser.display_name,
+        requesterEmail: currentUser.email,
         vendorId: card.vendor_id ?? undefined,
         portfolioId: card.portfolio_id,
         message: quoteMessage.trim() || `${card.title} 관련 상담 요청`,
       });
       setQuotedPortfolioIds((prev) => (prev.includes(card.portfolio_id) ? prev : [...prev, card.portfolio_id]));
-      setActionNotice({ tone: "ok", message: "문의가 접수되었습니다." });
+      setActionNotice({ tone: "ok", message: `문의 접수 완료 (${formatDateTimeLabel(result.created_at)})` });
       setQuoteModalCard(null);
       setQuoteMessage("");
     } catch (e) {
@@ -747,11 +800,75 @@ export default function App() {
     }
   }
 
+  async function submitAuth() {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const result = authMode === "login"
+        ? await login({ email: authEmail.trim(), password: authPassword })
+        : await signup({ email: authEmail.trim(), password: authPassword, displayName: authDisplayName.trim() });
+      setAuthToken(result.access_token);
+      setCurrentUser(result.user);
+      window.localStorage.setItem(AUTH_TOKEN_KEY, result.access_token);
+      setAuthPassword("");
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "인증에 실패했습니다.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function onLogout() {
+    if (authToken) {
+      try {
+        await logout(authToken);
+      } catch {
+        // ignore logout errors
+      }
+    }
+    setAuthToken("");
+    setCurrentUser(null);
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
+
   function resetMapView() {
     if (!mapRef.current) return;
     mapRef.current.setView(DEFAULT_CENTER, DEFAULT_BOUNDS.zoom);
     setMapMode("bounds");
     setUserLocation(null);
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="auth-page">
+        <section className="auth-card">
+          <h1>PlaniFit</h1>
+          <p>로그인 후 저장/문의 기능을 사용할 수 있습니다.</p>
+          <div className="auth-tabs">
+            <button className={authMode === "login" ? "active" : ""} onClick={() => setAuthMode("login")}>로그인</button>
+            <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>회원가입</button>
+          </div>
+          <label>
+            이메일
+            <input value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" />
+          </label>
+          {authMode === "signup" ? (
+            <label>
+              이름
+              <input value={authDisplayName} onChange={(e) => setAuthDisplayName(e.target.value)} placeholder="홍길동" />
+            </label>
+          ) : null}
+          <label>
+            비밀번호
+            <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="8자 이상" />
+          </label>
+          {authError ? <p className="auth-error">{authError}</p> : null}
+          <button className="auth-submit" onClick={() => void submitAuth()} disabled={authLoading}>
+            {authLoading ? "처리 중..." : authMode === "login" ? "로그인" : "회원가입"}
+          </button>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -762,10 +879,11 @@ export default function App() {
           <p>지도에서 평형 타입별 인테리어 사례를 한 번에 탐색</p>
         </div>
         <div className="top-actions">
-          <label className="user-key">
-            user_key
-            <input value={userKey} onChange={(e) => setUserKey(e.target.value)} placeholder="demo-user" />
-          </label>
+          <div className="user-badge">
+            <strong>{currentUser.display_name}</strong>
+            <span>{currentUser.email}</span>
+          </div>
+          <button className="logout-btn" onClick={() => void onLogout()}>로그아웃</button>
         </div>
       </header>
 

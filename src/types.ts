@@ -92,6 +92,30 @@ export interface PortfolioFilters {
   vendor_id?: number;
 }
 
+export interface AuthUser {
+  user_id: number;
+  email: string;
+  display_name: string;
+  user_key: string;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  user: AuthUser;
+}
+
+export interface QuoteRequestResponse {
+  quote_request_id: number;
+  user_key: string;
+  requester_name?: string | null;
+  requester_email?: string | null;
+  vendor_id?: number | null;
+  portfolio_id?: number | null;
+  created_at: string;
+}
+
 export interface AdminPortfolio {
   portfolio_id: number;
   complex_id: number;

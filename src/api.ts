@@ -1,4 +1,6 @@
 import type {
+  AuthTokenResponse,
+  AuthUser,
   AdminBlogPost,
   AdminBlogPostCreateInput,
   AdminFloorPlanPin,
@@ -12,6 +14,7 @@ import type {
   NearbyComplexesResponse,
   PortfolioFilters,
   PortfolioListResponse,
+  QuoteRequestResponse,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
@@ -129,18 +132,68 @@ export async function saveFavorite(userKey: string, portfolioId: number): Promis
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to save favorite"));
 }
 
+export async function signup(input: {
+  email: string;
+  password: string;
+  displayName: string;
+}): Promise<AuthTokenResponse> {
+  const res = await fetch(buildUrl("/auth/signup"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: input.email,
+      password: input.password,
+      display_name: input.displayName,
+    }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to sign up"));
+  return res.json();
+}
+
+export async function login(input: { email: string; password: string }): Promise<AuthTokenResponse> {
+  const res = await fetch(buildUrl("/auth/login"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to log in"));
+  return res.json();
+}
+
+export async function fetchMe(token: string): Promise<AuthUser> {
+  const res = await fetch(buildUrl("/auth/me"), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to fetch current user"));
+  return res.json();
+}
+
+export async function logout(token: string): Promise<void> {
+  await fetch(buildUrl("/auth/logout"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function requestQuote(params: {
-  userKey: string;
+  userKey?: string;
+  authToken?: string;
+  requesterName?: string;
+  requesterEmail?: string;
   vendorId?: number;
   portfolioId?: number;
   message?: string;
   preferredDate?: string;
-}): Promise<void> {
+}): Promise<QuoteRequestResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (params.authToken) headers.Authorization = `Bearer ${params.authToken}`;
   const res = await fetch(buildUrl("/quote-requests"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       user_key: params.userKey,
+      requester_name: params.requesterName,
+      requester_email: params.requesterEmail,
       vendor_id: params.vendorId,
       portfolio_id: params.portfolioId,
       message: params.message,
@@ -148,6 +201,7 @@ export async function requestQuote(params: {
     }),
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to request quote"));
+  return res.json();
 }
 
 export async function adminListPortfolios(adminKey: string): Promise<AdminPortfolio[]> {

@@ -51,24 +51,24 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function parsePositiveNumber(value: string): number | undefined {
-  if (!value.trim()) return undefined;
-  const num = Number(value);
-  if (!Number.isFinite(num) || num < 0) return undefined;
-  return num;
-}
-
 function priceLabel(min?: number | null, max?: number | null) {
-  if (min == null && max == null) return "예산 미정";
+  if (min == null && max == null) return "시공비 미공개";
   const lo = min == null ? "-" : `${Math.round(min / 10000).toLocaleString()}만원`;
   const hi = max == null ? "-" : `${Math.round(max / 10000).toLocaleString()}만원`;
-  return `${lo} ~ ${hi}`;
+  return lo === hi ? lo : `${lo} ~ ${hi}`;
+}
+
+function workScopeLabel(scope: WorkScopeType) {
+  if (scope === "full_remodeling") return "전체 리모델링";
+  if (scope === "partial") return "부분 공사";
+  if (scope === "kitchen") return "주방";
+  return "욕실";
 }
 
 function cardSummary(card: PortfolioCard) {
   const duration = card.duration_days ? `${card.duration_days}일` : "기간 미정";
   const vendor = card.vendor_name ?? "업체 미지정";
-  return `예산 ${priceLabel(card.budget_min_krw, card.budget_max_krw)} · ${card.work_scope} · ${duration} · ${vendor}`;
+  return `시공비 ${priceLabel(card.budget_min_krw, card.budget_max_krw)} · ${workScopeLabel(card.work_scope)} · ${duration} · ${vendor}`;
 }
 
 function defaultImageSide(card: PortfolioCard): CardImageSide | null {
@@ -149,9 +149,6 @@ export default function App() {
   const [portfolios, setPortfolios] = useState<PortfolioCard[]>([]);
 
   const [filters, setFilters] = useState<PortfolioFilters>(DEFAULT_FILTERS);
-  const [workScopeDraft, setWorkScopeDraft] = useState<WorkScopeType | "">("");
-  const [minAreaDraft, setMinAreaDraft] = useState("");
-  const [budgetMaxDraft, setBudgetMaxDraft] = useState("");
 
   const [userKey, setUserKey] = useState("demo-user");
 
@@ -170,7 +167,6 @@ export default function App() {
   const [vendorSearch, setVendorSearch] = useState("");
   const [favoriteVendorIds, setFavoriteVendorIds] = useState<number[]>([]);
   const [autoFavoriteVendorFilter, setAutoFavoriteVendorFilter] = useState(true);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const syncBoundsFromMap = () => {
     const map = mapRef.current;
@@ -277,7 +273,6 @@ export default function App() {
         if (cancelled) return;
         setClusters(data.clusters);
         setComplexes(data.complexes);
-        setStatus("지도 데이터 업데이트 완료");
       } catch (e) {
         if (cancelled) return;
         setStatus(e instanceof Error ? e.message : "지도 데이터를 불러오지 못했습니다.");
@@ -355,7 +350,6 @@ export default function App() {
         const data = await fetchPortfolios(selectedComplex.complex_id, selectedUnitType.unit_type_id, resolvedFilters);
         if (cancelled) return;
         setPortfolios(data.items);
-        setStatus(`조회 완료: ${data.total}건`);
         if (highlightList) {
           cardsRef.current?.scrollTo({ top: 0, behavior: "smooth" });
         }
@@ -411,9 +405,8 @@ export default function App() {
 
   const activeFilterChips = useMemo(() => {
     const chips: Array<{ key: keyof PortfolioFilters; label: string }> = [];
-    if (filters.work_scope) chips.push({ key: "work_scope", label: `범위 ${filters.work_scope}` });
+    if (filters.work_scope) chips.push({ key: "work_scope", label: `공사범위 ${workScopeLabel(filters.work_scope)}` });
     if (filters.min_area !== undefined) chips.push({ key: "min_area", label: `최소평형 ${filters.min_area}` });
-    if (filters.budget_max_krw !== undefined) chips.push({ key: "budget_max_krw", label: `예산상한 ${filters.budget_max_krw.toLocaleString()}원` });
     if (effectiveVendorId !== undefined) {
       chips.push({
         key: "vendor_id",
@@ -561,27 +554,12 @@ export default function App() {
     }
   }
 
-  function applyFilters() {
-    setFilters({
-      work_scope: workScopeDraft || undefined,
-      min_area: parsePositiveNumber(minAreaDraft),
-      budget_max_krw: parsePositiveNumber(budgetMaxDraft),
-    });
+  function toggleWorkScopeFilter(scope: WorkScopeType) {
+    setFilters((prev) => ({ ...prev, work_scope: prev.work_scope === scope ? undefined : scope }));
   }
 
-  function applyPreset(type: "partial" | "budget20" | "area59") {
-    if (type === "partial") {
-      setWorkScopeDraft("partial");
-      setFilters((prev) => ({ ...prev, work_scope: "partial" }));
-      return;
-    }
-    if (type === "budget20") {
-      setBudgetMaxDraft("20000000");
-      setFilters((prev) => ({ ...prev, budget_max_krw: 20000000 }));
-      return;
-    }
-    setMinAreaDraft("59");
-    setFilters((prev) => ({ ...prev, min_area: 59 }));
+  function toggleMinAreaFilter(area: number) {
+    setFilters((prev) => ({ ...prev, min_area: prev.min_area === area ? undefined : area }));
   }
 
   function clearFilter(key: keyof PortfolioFilters) {
@@ -590,9 +568,6 @@ export default function App() {
       delete next[key];
       return next;
     });
-    if (key === "work_scope") setWorkScopeDraft("");
-    if (key === "min_area") setMinAreaDraft("");
-    if (key === "budget_max_krw") setBudgetMaxDraft("");
   }
 
   function filterByVendor(card: PortfolioCard) {
@@ -654,11 +629,8 @@ export default function App() {
     };
   }, [mapMode, userLocation, nearbyRadiusM, effectiveVendorId]);
 
-  function resetFilters() {
-    setWorkScopeDraft("");
-    setMinAreaDraft("");
-    setBudgetMaxDraft("");
-    setFilters(DEFAULT_FILTERS);
+  function clearQuickFilters() {
+    setFilters((prev) => ({ ...prev, work_scope: undefined, min_area: undefined }));
   }
 
   async function focusNearby() {
@@ -734,16 +706,6 @@ export default function App() {
     }
   }
 
-  function zoomIn() {
-    if (!mapRef.current) return;
-    mapRef.current.setZoom(clamp(mapRef.current.getZoom() + 1, 7, 18));
-  }
-
-  function zoomOut() {
-    if (!mapRef.current) return;
-    mapRef.current.setZoom(clamp(mapRef.current.getZoom() - 1, 7, 18));
-  }
-
   function resetMapView() {
     if (!mapRef.current) return;
     mapRef.current.setView(DEFAULT_CENTER, DEFAULT_BOUNDS.zoom);
@@ -759,68 +721,41 @@ export default function App() {
           <p>지도에서 평형 타입별 인테리어 사례를 한 번에 탐색</p>
         </div>
         <div className="top-actions">
-          <button
-            className={showAdvancedFilters ? "top-filter-toggle active" : "top-filter-toggle"}
-            onClick={() => setShowAdvancedFilters((prev) => !prev)}
-          >
-            필터
-          </button>
           <label className="user-key">
             user_key
             <input value={userKey} onChange={(e) => setUserKey(e.target.value)} placeholder="demo-user" />
           </label>
-          <div className="zoom-controls">
-            <button onClick={zoomOut}>-</button>
-            <span>Z{bounds.zoom}</span>
-            <button onClick={zoomIn}>+</button>
-          </div>
         </div>
       </header>
 
-      {showAdvancedFilters ? (
-        <>
-          <section className="filter-row">
-            <label>
-              공사범위
-              <select value={workScopeDraft} onChange={(e) => setWorkScopeDraft((e.target.value as WorkScopeType) || "")}>
-                <option value="">전체</option>
-                <option value="full_remodeling">전체 리모델링</option>
-                <option value="partial">부분 공사</option>
-                <option value="kitchen">주방</option>
-                <option value="bathroom">욕실</option>
-              </select>
-            </label>
-            <label>
-              최소 평형(m2)
-              <input type="number" placeholder="59" value={minAreaDraft} onChange={(e) => setMinAreaDraft(e.target.value)} />
-            </label>
-            <label>
-              예산 상한(원)
-              <input
-                type="number"
-                placeholder="50000000"
-                value={budgetMaxDraft}
-                onChange={(e) => setBudgetMaxDraft(e.target.value)}
-              />
-            </label>
-            <div className="filter-buttons">
-              <button className="apply" onClick={applyFilters}>필터 적용</button>
-              <button className="reset" onClick={resetFilters}>필터 초기화</button>
-            </div>
-          </section>
-
-          <section className="preset-row">
-            <button onClick={() => applyPreset("partial")}>부분공사</button>
-            <button onClick={() => applyPreset("budget20")}>2천만 이하</button>
-            <button onClick={() => applyPreset("area59")}>59m2 이상</button>
-            {activeFilterChips.map((chip) => (
-              <button key={chip.key} className="active-chip" onClick={() => clearFilter(chip.key)}>
-                {chip.label} ×
-              </button>
-            ))}
-          </section>
-        </>
-      ) : null}
+      <section className="preset-row">
+        <button className={filters.work_scope === "partial" ? "active-chip" : ""} onClick={() => toggleWorkScopeFilter("partial")}>
+          부분공사
+        </button>
+        <button className={filters.work_scope === "full_remodeling" ? "active-chip" : ""} onClick={() => toggleWorkScopeFilter("full_remodeling")}>
+          전체 리모델링
+        </button>
+        <button className={filters.work_scope === "kitchen" ? "active-chip" : ""} onClick={() => toggleWorkScopeFilter("kitchen")}>
+          주방
+        </button>
+        <button className={filters.work_scope === "bathroom" ? "active-chip" : ""} onClick={() => toggleWorkScopeFilter("bathroom")}>
+          욕실
+        </button>
+        <button className={filters.min_area === 59 ? "active-chip" : ""} onClick={() => toggleMinAreaFilter(59)}>
+          59m2+
+        </button>
+        <button className={filters.min_area === 84 ? "active-chip" : ""} onClick={() => toggleMinAreaFilter(84)}>
+          84m2+
+        </button>
+        {(filters.work_scope || filters.min_area !== undefined) ? (
+          <button onClick={clearQuickFilters}>빠른필터 초기화</button>
+        ) : null}
+        {activeFilterChips.map((chip) => (
+          <button key={chip.key} className="active-chip" onClick={() => clearFilter(chip.key)}>
+            {chip.label} ×
+          </button>
+        ))}
+      </section>
 
       <main className="content">
         <section className="map-panel">
@@ -833,13 +768,7 @@ export default function App() {
               <option value={5000}>5km</option>
             </select>
             {mapMode === "nearby" ? <button onClick={backToBoundsMode}>일반 탐색</button> : null}
-            {loadingMap ? (
-              <span>지도 로딩 중...</span>
-            ) : (
-              <span>
-                {mapMode === "nearby" ? "근처 보기" : "기본 보기"} · 클러스터 {clusters.length} / 핀 {complexes.length}
-              </span>
-            )}
+            {loadingMap ? <span>지도 로딩 중...</span> : null}
           </div>
           <div className="map-canvas" ref={mapContainerRef} />
         </section>

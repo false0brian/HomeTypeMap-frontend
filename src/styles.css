@@ -84,8 +84,8 @@ button {
 }
 
 .top-logo {
-  width: 88px;
-  height: 88px;
+  width: 280px;
+  height: 92px;
   object-fit: contain;
   border-radius: 12px;
   border: 1px solid var(--line);

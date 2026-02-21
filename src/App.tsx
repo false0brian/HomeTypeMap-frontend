@@ -170,6 +170,7 @@ export default function App() {
   const [authDisplayName, setAuthDisplayName] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [guestMode, setGuestMode] = useState(false);
 
   const [loadingMap, setLoadingMap] = useState(false);
   const [loadingPortfolios, setLoadingPortfolios] = useState(false);
@@ -236,6 +237,10 @@ export default function App() {
       cancelled = true;
     };
   }, [authToken]);
+
+  useEffect(() => {
+    if (currentUser) setGuestMode(false);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -838,7 +843,7 @@ export default function App() {
     setUserLocation(null);
   }
 
-  if (!currentUser) {
+  if (!currentUser && !guestMode) {
     return (
       <div className="auth-page">
         <section className="auth-card">
@@ -866,6 +871,9 @@ export default function App() {
           <button className="auth-submit" onClick={() => void submitAuth()} disabled={authLoading}>
             {authLoading ? "처리 중..." : authMode === "login" ? "로그인" : "회원가입"}
           </button>
+          <button className="auth-guest" onClick={() => setGuestMode(true)} disabled={authLoading}>
+            비회원으로 지도 둘러보기
+          </button>
         </section>
       </div>
     );
@@ -879,11 +887,17 @@ export default function App() {
           <p>지도에서 평형 타입별 인테리어 사례를 한 번에 탐색</p>
         </div>
         <div className="top-actions">
-          <div className="user-badge">
-            <strong>{currentUser.display_name}</strong>
-            <span>{currentUser.email}</span>
-          </div>
-          <button className="logout-btn" onClick={() => void onLogout()}>로그아웃</button>
+          {currentUser ? (
+            <>
+              <div className="user-badge">
+                <strong>{currentUser.display_name}</strong>
+                <span>{currentUser.email}</span>
+              </div>
+              <button className="logout-btn" onClick={() => void onLogout()}>로그아웃</button>
+            </>
+          ) : (
+            <button className="logout-btn" onClick={() => setGuestMode(false)}>로그인 / 회원가입</button>
+          )}
         </div>
       </header>
 

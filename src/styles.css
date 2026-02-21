@@ -937,6 +937,15 @@ button {
   padding: 10px 12px;
 }
 
+.auth-guest {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: #2f4458;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
 .mobile-panel-tabs {
   display: none;
 }

@@ -145,6 +145,42 @@ function markerIcon(className: string, text: string): L.DivIcon {
   });
 }
 
+function attachTileLayerWithFallback(map: L.Map) {
+  const providers = [
+    {
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: "abc",
+    },
+    {
+      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+    },
+  ] as const;
+
+  let index = 0;
+  let layer: L.TileLayer | null = null;
+  const bind = () => {
+    const p = providers[index];
+    layer = L.tileLayer(p.url, {
+      attribution: p.attribution,
+      subdomains: p.subdomains,
+      maxZoom: 19,
+      crossOrigin: true,
+    });
+    layer.on("tileerror", () => {
+      if (index >= providers.length - 1) return;
+      index += 1;
+      if (layer) map.removeLayer(layer);
+      bind();
+      layer?.addTo(map);
+    });
+    layer.addTo(map);
+  };
+  bind();
+}
+
 export default function App() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -257,9 +293,7 @@ export default function App() {
     markerLayerRef.current = L.layerGroup().addTo(map);
     userLayerRef.current = L.layerGroup().addTo(map);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    attachTileLayerWithFallback(map);
 
     map.on("moveend", syncBoundsFromMap);
     map.on("zoomend", syncBoundsFromMap);

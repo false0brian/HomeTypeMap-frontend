@@ -1144,16 +1144,22 @@ button {
   .topbar-stack {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
   }
 
-  .logo-panel,
-  .auth-panel {
-    width: 100%;
+  .logo-panel {
+    grid-column: 1;
+    justify-self: center;
   }
 
   .auth-panel {
-    justify-content: flex-end;
+    grid-column: 1;
+    justify-self: end;
+  }
+
+  .top-logo {
+    width: min(82vw, 360px);
+    height: auto;
   }
 
   .filter-row {

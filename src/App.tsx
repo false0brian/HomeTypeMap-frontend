@@ -899,7 +899,6 @@ export default function App() {
             alt="PlaniFit 로그인 배너"
             loading="lazy"
           />
-          <h1>PlaniFit</h1>
           <p>로그인 후 저장/문의 기능을 사용할 수 있습니다.</p>
           <div className="auth-tabs">
             <button className={authMode === "login" ? "active" : ""} onClick={() => setAuthMode("login")}>로그인</button>
@@ -924,7 +923,7 @@ export default function App() {
             {authLoading ? "처리 중..." : authMode === "login" ? "로그인" : "회원가입"}
           </button>
           <button className="auth-guest" onClick={() => setGuestMode(true)} disabled={authLoading}>
-            비회원으로 지도 둘러보기
+            둘러보기
           </button>
         </section>
       </div>

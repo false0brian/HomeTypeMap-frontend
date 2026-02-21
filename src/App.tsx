@@ -934,7 +934,7 @@ export default function App() {
     <div className="page">
       <section className="topbar-stack">
         <div className="logo-panel">
-          <img className="top-logo" src="/logo-wide.svg" alt="PlaniFit logo" />
+          <img className="top-logo" src="/logo-wide.png" alt="PlaniFit logo" />
         </div>
         <div className="auth-panel">
           {currentUser ? (

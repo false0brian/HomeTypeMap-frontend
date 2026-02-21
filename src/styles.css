@@ -416,6 +416,10 @@ body {
   cursor: crosshair;
 }
 
+.floor-plan-editor.dragging {
+  cursor: grabbing;
+}
+
 .editor-pin {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -427,12 +431,16 @@ body {
   font-size: 11px;
   font-weight: 800;
   background: #325f8c;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .editor-pin.active {
   background: #226f54;
   outline: 2px solid #95d0b4;
+}
+
+.floor-plan-editor.dragging .editor-pin.active {
+  cursor: grabbing;
 }
 
 .pin-actions {

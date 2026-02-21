@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import {
   adminCreateFloorPlanPin,
@@ -17,6 +17,7 @@ import type { AdminBlogPost, AdminFloorPlanPin, AdminPortfolio, PublishStatus } 
 const DEFAULT_ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY ?? "";
 
 export default function AdminApp() {
+  const floorPlanEditorRef = useRef<HTMLDivElement | null>(null);
   const [adminKey, setAdminKey] = useState(DEFAULT_ADMIN_KEY);
   const [status, setStatus] = useState("관리자 콘솔 준비 중");
   const [portfolios, setPortfolios] = useState<AdminPortfolio[]>([]);
@@ -24,6 +25,7 @@ export default function AdminApp() {
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
   const [pins, setPins] = useState<AdminFloorPlanPin[]>([]);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
+  const [draggingPinId, setDraggingPinId] = useState<number | null>(null);
   const [pinForm, setPinForm] = useState({
     x_ratio: "50",
     y_ratio: "50",
@@ -197,11 +199,48 @@ export default function AdminApp() {
     }
   }
 
-  function onFloorPlanClick(clientX: number, clientY: number, el: HTMLElement) {
+  function ratioFromClient(clientX: number, clientY: number, el: HTMLElement) {
     const rect = el.getBoundingClientRect();
     const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+    return { x, y };
+  }
+
+  function onFloorPlanClick(clientX: number, clientY: number, el: HTMLElement) {
+    if (draggingPinId) return;
+    const { x, y } = ratioFromClient(clientX, clientY, el);
     setPinForm((prev) => ({ ...prev, x_ratio: x.toFixed(2), y_ratio: y.toFixed(2) }));
+  }
+
+  function onDragStart(pin: AdminFloorPlanPin) {
+    setDraggingPinId(pin.pin_id);
+    editPin(pin);
+  }
+
+  function onEditorMouseMove(clientX: number, clientY: number) {
+    if (!draggingPinId || !floorPlanEditorRef.current) return;
+    const { x, y } = ratioFromClient(clientX, clientY, floorPlanEditorRef.current);
+    setPinForm((prev) => ({ ...prev, x_ratio: x.toFixed(2), y_ratio: y.toFixed(2) }));
+    setPins((prev) =>
+      prev.map((pin) => (pin.pin_id === draggingPinId ? { ...pin, x_ratio: x, y_ratio: y } : pin)),
+    );
+  }
+
+  async function onDragEnd() {
+    if (!draggingPinId || !selectedPortfolioId) return;
+    const pin = pins.find((x) => x.pin_id === draggingPinId);
+    setDraggingPinId(null);
+    if (!pin) return;
+    try {
+      await adminUpdateFloorPlanPin(adminKey.trim(), pin.pin_id, {
+        x_ratio: pin.x_ratio,
+        y_ratio: pin.y_ratio,
+      });
+      setStatus("핀 위치 저장 완료");
+      await refreshPins(selectedPortfolioId);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "핀 위치 저장 실패");
+    }
   }
 
   return (
@@ -298,8 +337,15 @@ export default function AdminApp() {
           </div>
 
           <div
-            className="floor-plan-editor"
-            onClick={(e) => onFloorPlanClick(e.clientX, e.clientY, e.currentTarget)}
+            ref={floorPlanEditorRef}
+            className={draggingPinId ? "floor-plan-editor dragging" : "floor-plan-editor"}
+            onClick={(e) => {
+              if (e.target !== e.currentTarget) return;
+              onFloorPlanClick(e.clientX, e.clientY, e.currentTarget);
+            }}
+            onMouseMove={(e) => onEditorMouseMove(e.clientX, e.clientY)}
+            onMouseUp={() => void onDragEnd()}
+            onMouseLeave={() => void onDragEnd()}
           >
             {pins.map((pin) => (
               <button
@@ -307,9 +353,9 @@ export default function AdminApp() {
                 type="button"
                 className={editingPinId === pin.pin_id ? "editor-pin active" : "editor-pin"}
                 style={{ left: `${pin.x_ratio}%`, top: `${pin.y_ratio}%` }}
-                onClick={(e) => {
+                onMouseDown={(e) => {
                   e.stopPropagation();
-                  editPin(pin);
+                  onDragStart(pin);
                 }}
                 title={pin.title ?? `pin-${pin.pin_id}`}
               >

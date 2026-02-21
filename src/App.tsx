@@ -893,6 +893,12 @@ export default function App() {
     return (
       <div className="auth-page">
         <section className="auth-card">
+          <img
+            className="auth-hero"
+            src="/Gemini_Generated_Image_ayzllbayzllbayzl.png"
+            alt="PlaniFit 로그인 배너"
+            loading="lazy"
+          />
           <h1>PlaniFit</h1>
           <p>로그인 후 저장/문의 기능을 사용할 수 있습니다.</p>
           <div className="auth-tabs">

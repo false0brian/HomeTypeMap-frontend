@@ -876,6 +876,15 @@ button {
   gap: 10px;
 }
 
+.auth-hero {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f1f4f7;
+}
+
 .auth-card h1 {
   margin: 0;
   font-size: 28px;

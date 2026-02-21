@@ -266,6 +266,9 @@ export default function App() {
     syncBoundsFromMap();
 
     setStatus("지도 준비 완료. 핀을 선택하세요.");
+    window.setTimeout(() => {
+      map.invalidateSize();
+    }, 0);
 
     return () => {
       map.off("moveend", syncBoundsFromMap);
@@ -276,6 +279,15 @@ export default function App() {
       userLayerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const raf = window.requestAnimationFrame(() => {
+      map.invalidateSize();
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [currentUser, guestMode]);
 
   useEffect(() => {
     try {
